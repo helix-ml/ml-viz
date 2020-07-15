@@ -1,3 +1,4 @@
+## Example Usage
 import icicle_plot
 import dash
 from dash.dependencies import Input, Output
