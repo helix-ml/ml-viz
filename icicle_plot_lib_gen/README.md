@@ -1,6 +1,6 @@
 # Icicle Plot
 
-Icicle Plot is a Dash component library.
+Icicle Plot is a custom Dash component library.
 
 Get started with:
 1. Install Dash and its dependencies: https://dash.plotly.com/installation
