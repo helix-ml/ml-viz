@@ -1,0 +1,7 @@
+include icicle_plot/icicle_plot.min.js
+include icicle_plot/icicle_plot.min.js.map
+include icicle_plot/metadata.json
+include icicle_plot/package-info.json
+include README.md
+include LICENSE
+include package.json

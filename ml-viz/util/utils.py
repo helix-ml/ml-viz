@@ -12,7 +12,7 @@ def clean_model_names(row):
         model_comps[j] = model_comps[j].split(".")[len(model_comps[j].split(".")) - 1]
     row = ", ".join(model_comps)
     return row.replace("\'", "").replace("}", "").replace("{", "")
-
+    
 def clean_model_params(row):
     comps = row.split("(")
     filtered = []
