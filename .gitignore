@@ -1,3 +1,7 @@
+### Data ###
+*.csv
+ml-viz/mlruns/
+
 ### Node ###
 # Logs
 logs
@@ -240,4 +244,3 @@ dmypy.json
 
 # PyCharm
 .idea/
-*.csv
