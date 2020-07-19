@@ -11,25 +11,25 @@ data = {
       'color': 'magenta',
       'children': [{
         'name': 'a',
-        'color': 'yellow',
+        'color': 0.7,
         'size': 1
       },{
         'name': 'b',
         'color': 'red',
         'children': [{
           'name': 'ba',
-          'color': 'orange',
+          'color': 0.8,
           'size': 1
         }, {
           'name': 'bb',
-          'color': 'blue',
+          'color': 0.9,
           'children': [{
             'name': 'bba',
-            'color': 'green',
+            'color': 0.85,
             'size': 1
           }, {
             'name': 'bbb',
-            'color': 'pink',
+            'color': 0.7,
             'size': 1
           }]
         }]

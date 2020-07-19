@@ -2,6 +2,7 @@ import React, {Component} from 'react';
 import PropTypes from 'prop-types';
 import fromKapsule from 'react-kapsule';
 import IcicleD3 from '../d3/icicle-chart';
+import * as d3 from "d3";
 
 
 export default class Icicle extends Component {
@@ -20,7 +21,8 @@ export default class Icicle extends Component {
     const IcicleComp = fromKapsule(IcicleD3, {
       methodNames: ['zoomToNode']
     });
-    return <IcicleComp ref={inpute => this.icicleref = inpute} orientation={'td'} data={this.props.data} size={'size'} color={'color'} height={400} onClick = {(e) => {
+    const color = d3.scaleSequential(d3.interpolate("red", "blue")).domain([0.7, 0.9]);
+    return <IcicleComp ref={inpute => this.icicleref = inpute} orientation={'td'} data={this.props.data} size={'size'} color={d => color(d.color)} height={400} onClick = {(e) => {
       console.log(e);
       let pathBuilder = "";
       let current = e.__dataNode;

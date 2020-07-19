@@ -16,6 +16,7 @@
   "author": "Dhruv Mangtani <dhruv.mangtani@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "d3": "^5.16.0",
     "ramda": "^0.26.1",
     "react-flame-graph": "^1.4.0",
     "react-kapsule": "^2.1.9",
