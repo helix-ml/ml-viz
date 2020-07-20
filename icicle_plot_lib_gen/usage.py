@@ -41,6 +41,8 @@ app.layout = html.Div([
         id='icicle',
         value='my-value',
         label='my-label',
+        high=0.9,
+        low=0.7,
         data=data
     ),
     html.Div(id='output')

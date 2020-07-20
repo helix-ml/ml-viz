@@ -38,6 +38,20 @@
         },
         "required": true,
         "description": ""
+      },
+      "low": {
+        "type": {
+          "name": "number"
+        },
+        "required": false,
+        "description": ""
+      },
+      "high": {
+        "type": {
+          "name": "number"
+        },
+        "required": false,
+        "description": ""
       }
     }
   }

@@ -10,7 +10,8 @@
 }
 
 \usage{
-icicle(id=NULL, label=NULL, value=NULL, data=NULL)
+icicle(id=NULL, label=NULL, value=NULL, data=NULL, low=NULL,
+high=NULL)
 }
 
 \arguments{
@@ -21,6 +22,10 @@ icicle(id=NULL, label=NULL, value=NULL, data=NULL)
 \item{value}{Character. The value displayed in the input.}
 
 \item{data}{Named list. }
+
+\item{low}{Numeric. }
+
+\item{high}{Numeric. }
 }
 
 \value{named list of JSON elements corresponding to React.js properties and their values}

@@ -21,8 +21,12 @@ export default class Icicle extends Component {
     const IcicleComp = fromKapsule(IcicleD3, {
       methodNames: ['zoomToNode']
     });
-    const color = d3.scaleSequential(d3.interpolate("red", "blue")).domain([0.7, 0.9]);
-    return <IcicleComp ref={inpute => this.icicleref = inpute} orientation={'td'} data={this.props.data} size={'size'} color={d => color(d.color)} height={400} onClick = {(e) => {
+
+    return <IcicleComp ref={inpute => this.icicleref = inpute} orientation={'td'} data={this.props.data} size={'size'} color={(d) => {
+      let color_padding = (this.props.high - this.props.low) * 0.75;
+      const color = d3.scaleSequential(d3.interpolate("red", "blue")).domain([this.props.low - color_padding, this.props.high + color_padding]);
+      return color(d.color);
+    }} height={400} onClick = {(e) => {
       console.log(e);
       let pathBuilder = "";
       let current = e.__dataNode;
@@ -34,11 +38,34 @@ export default class Icicle extends Component {
         current = current.parent;
       }
 
+      var traverser = e;
+      var high = -1.0;
+      var low = 2.0;
+      let stack = [];
+      stack.push(traverser);
+      while(stack.length > 0) {
+        traverser = stack.pop();
+        if (traverser.children) {
+          for(let i=0; i<traverser.children.length; i++) {
+            stack.push(traverser.children[i]);
+          }
+        } else {
+          if(traverser.color > high) {
+            high = traverser.color;
+          }
+          if(traverser.color < low) {
+            low = traverser.color;
+          }
+        }
+      }
+
       // get the value from the DOM node
       const newValue = pathBuilder;
       // update the state!
       this.props.setProps({
-        value: newValue
+        value: newValue,
+        low: low,
+        high: high
       });
 
 
@@ -74,5 +101,9 @@ Icicle.propTypes = {
      */
     setProps: PropTypes.func,
 
-    data: PropTypes.object.isRequired
+    data: PropTypes.object.isRequired,
+
+    low: PropTypes.number,
+
+    high: PropTypes.number
 };
