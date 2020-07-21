@@ -26,7 +26,7 @@ export default class Icicle extends Component {
       let color_padding = (this.props.high - this.props.low) * 0.75;
       const color = d3.scaleSequential(d3.interpolate("red", "blue")).domain([this.props.low - color_padding, this.props.high + color_padding]);
       return color(d.color);
-    }} height={400} onClick = {(e) => {
+    }} height={300} onClick = {(e) => {
       console.log(e);
       let pathBuilder = "";
       let current = e.__dataNode;
