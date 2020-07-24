@@ -39,7 +39,7 @@ data = {
 app.layout = html.Div([
     icicle_plot.Icicle(
         id='icicle',
-        value='my-value',
+        value='main/',
         label='my-label',
         high=0.9,
         low=0.7,
