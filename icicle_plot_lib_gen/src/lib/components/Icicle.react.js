@@ -22,7 +22,7 @@ export default class Icicle extends Component {
       methodNames: ['zoomToNode']
     });
 
-    let iciclecomp =  <IcicleComp ref={inpute => this.icicleref = inpute} orientation={'td'} data={this.props.data} size={'size'} color={(d) => {
+    return <IcicleComp ref={inpute => this.icicleref = inpute} orientation={'td'} data={this.props.data} size={'size'} color={(d) => {
       if(typeof d.color === 'string'){
         return d.color;
       }
