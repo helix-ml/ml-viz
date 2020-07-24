@@ -9,7 +9,7 @@ export default class Icicle extends Component {
   constructor(props) {
     super(props);
     this.state = {
-      value:'default'
+      value:props.value
     }
   }
   
@@ -23,7 +23,11 @@ export default class Icicle extends Component {
     });
 
     return <IcicleComp ref={inpute => this.icicleref = inpute} orientation={'td'} data={this.props.data} size={'size'} color={(d) => {
-      let color_padding = (this.props.high - this.props.low) * 0.75;
+      if(typeof d.color === 'string'){
+        return d.color;
+      }
+
+      let color_padding = (this.props.high - this.props.low) * 0.5;
       const color = d3.scaleSequential(d3.interpolate("red", "blue")).domain([this.props.low - color_padding, this.props.high + color_padding]);
       return color(d.color);
     }} height={300} onClick = {(e) => {

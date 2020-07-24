@@ -11,7 +11,7 @@ data = {
       'color': 'magenta',
       'children': [{
         'name': 'a',
-        'color': 0.7,
+        'color': 'green',
         'size': 1
       },{
         'name': 'b',
