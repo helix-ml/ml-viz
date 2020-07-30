@@ -16,7 +16,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.exceptions import PreventUpdate
-from dash.dependencies import Input, Output, ALL, MATCH
+from dash.dependencies import Input, Output, ALL, MATCH, State
 from IPython.display import display, HTML
 
 import sklearn
@@ -25,6 +25,9 @@ import xgboost as xgb
 import mlflow
 import mlflow.xgboost
 import mlflow.sklearn
+
+# libraries
+from sklearn.neural_network import MLPClassifier
 
 class DaVinciCode():
 
@@ -43,6 +46,11 @@ class DaVinciCode():
     port = 0
     pc = 0
     id_updater = 0
+
+    X_test = 0
+    X_train = 0
+    y_test = 0
+    y_train = 0
 
     def grab_autologs(self):
 
@@ -156,7 +164,7 @@ class DaVinciCode():
 
     ## Tree Functions
     # ok this one isn't recursion but the others are
-    def grab_node(path, dictionary):
+    def grab_node(self, path, dictionary):
         if path == ['main']:
             return dictionary
         current = dictionary
@@ -209,13 +217,27 @@ class DaVinciCode():
             dictionary['color'] = dictionary['children'][0]['color']
         return False
 
+    def is_number(s):
+        try:
+            complex(s) # for int, long, float and complex
+        except ValueError:
+            return False
+
+        return True
+
     def add_rec(self, path, value, dictionary):
-        node = {'name': value, 'color': 'grey', 'size': len(value) + 2}
+        node = {'name': value, 'color': 'grey', 'size': 2}
         if path == ['main']:
             dictionary['children'].append(node)
             return
-        current = grab_node(path, dictionary)
+        current = self.grab_node(path, dictionary)
+        current.pop('size', None)
+        if 'children' not in current:
+            current['children'] = []
         current['children'].append(node)
+
+    def execute_code(self, n_clicks, code):
+        exec(code.replace("app.", "self."))
 
     def init_app(self):
 
@@ -230,6 +252,9 @@ class DaVinciCode():
                 for i, g in ut.groupby(col_name):
                     data_key = g[col_name].iloc[0]
                     data[data_key] = {}
+
+        self.add_rec(['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p)
+        self.add_rec(['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p)
 
         data = copy.deepcopy(self.ut_p)
 
@@ -261,34 +286,57 @@ class DaVinciCode():
         for i in range(0, 100, 5):
             marks[i/100] = str(i/100)
 
+        button_style = {
+            "background-color": "#008CBA", 
+            "border": "none", 
+            "color": "white", 
+            "padding": "15px 32px", 
+            "text-align": "center", 
+            "display": "inline-block", 
+            "font-size": 16, 
+            "margin": "4px 2px", 
+            "cursor": "pointer",
+            "width": "18%"
+            }
+
         app.layout = html.Div([
-            dcc.RangeSlider(
-                id='metric-slider',
-                min=0,
-                max=1,
-                step=0.05,
-                value=[0, 1],
-                marks=marks
-            ),
-            html.Div(
-                icicle_plot_fig,
-                id='icicle-wrap'
-            ),
-            dcc.Graph(
-                id='pc',
-                figure=pc
-            ),
-            html.Div(id='output'),
-            dcc.Interval(
-                id='interval-component',
-                interval=1*1000, # in milliseconds
-                n_intervals=0
-            ),
-            dcc.Interval(
-                id='interval-component2',
-                interval=1*1000, # in milliseconds
-                n_intervals=0
-            )
+            html.Div([
+                dcc.RangeSlider(
+                    id='metric-slider',
+                    min=0,
+                    max=1,
+                    step=0.05,
+                    value=[0, 1],
+                    marks=marks
+                ),
+                html.Div(
+                    icicle_plot_fig,
+                    id='icicle-wrap'
+                ),
+                dcc.Graph(
+                    id='pc',
+                    figure=pc
+                ),
+                html.Div(id='output'),
+                dcc.Interval(
+                    id='interval-component',
+                    interval=1*1000, # in milliseconds
+                    n_intervals=0
+                ),
+                dcc.Interval(
+                    id='interval-component2',
+                    interval=1*1000, # in milliseconds
+                    n_intervals=0
+                )
+            ], style={'width': '78%', 'height': '500px', 'float':'left'}),
+            html.Div([
+                dcc.Textarea(
+                    id='sandbox',
+                    value='',
+                    style={'height': 400}
+                ),
+                html.Button('Execute', id='execute-button', style=button_style)
+            ], style={'margin-left': '5%'})
         ])
 
         @app.callback(
@@ -296,8 +344,6 @@ class DaVinciCode():
             [Input('metric-slider', 'value'),
             Input('interval-component', 'n_intervals')])
         def update_icicle(rangeData, n):
-            # global vars will break app in production!! switch to shared states at some point
-
             trigger_context = dash.callback_context.triggered[0]['prop_id']
             if len(dash.callback_context.triggered) <= 1 and self.update_available == False and (trigger_context == 'interval-component.n_intervals' or trigger_context == '.'):
                 raise PreventUpdate
@@ -335,7 +381,6 @@ class DaVinciCode():
                 Input('interval-component2', 'n_intervals')
             ])
         def update_pc(clickData, rangeData, n):
-
             trigger_context = dash.callback_context.triggered[0]['prop_id']
             if len(dash.callback_context.triggered) <= 1 and self.update_available == False and (trigger_context == 'interval-component2.n_intervals'):
                 raise PreventUpdate
@@ -353,6 +398,10 @@ class DaVinciCode():
                 
             if isinstance(clickData, list):
                 clickData = clickData[0]
+
+            if 'recommendationval' in clickData:
+                raise PreventUpdate
+
             if clickData.split("/")[:-2] == []:
                 pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
                                     color_continuous_scale='RdBu', height=350)
@@ -388,6 +437,42 @@ class DaVinciCode():
             self.pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
                                     color_continuous_scale='RdBu', height=350)
             return self.pc
+        
+        @app.callback(
+            Output('sandbox', 'value'),
+            [Input({'role': 'icicle_plot_fig', 'index': ALL}, 'value')])
+        def update_sandbox(clickData):
+            if len(clickData) == 0:
+                raise PreventUpdate
+            if isinstance(clickData, list):
+                clickData = clickData[0]
+            if 'recommendationval' in clickData:
+                # update the sand box
+                clickData = clickData.replace(" recommendationval", "")
+                model_name = ""
+                params_rec = {}
+                for i in clickData.split("/"):
+                    if 'main' in i or not i or not i.strip():
+                        continue
+
+                    # model name
+                    if '=' not in i:
+                        model_name = i
+                        continue
+                    
+                    try:
+                        params_rec[i.split("=")[0]] = float(i.split("=")[1]) # for int, long, float and complex
+                    except ValueError:
+                        params_rec[i.split("=")[0]] = i.split("=")[1]
+
+                code = "app.experiment(library = 'sklearn', model = " + model_name + ", params = " + str(params_rec) + ")"
+                return code
+            else:
+                raise PreventUpdate
+
+        app.callback(Output('output', 'value'),
+            [Input('execute-button', 'n_clicks')],
+            [State('sandbox', 'value')])(self.execute_code)
 
         self.app = app
 
@@ -399,25 +484,30 @@ class DaVinciCode():
         if self.display == False:
             self.init_app()
             self.display = True
-            self.app.run_server(mode='inline', port=self.port)
+            self.app.run_server(mode='inline', port=self.port, width=1000)
         # print("updated")
 
-    def run_experiment(self, library, Model, model_name, params, X_train, X_test, y_train, y_test):
+    def run_experiment(self, library, Model, params):
+        model_name = ""
+        if Model:
+            model_name = Model.__name__
+        else:
+            model_name = library
         if library == 'sklearn':
             with mlflow.start_run():
-                model = Model(**params).fit(X_train, y_train)
+                model = Model(**params).fit(self.X_train, self.y_train)
                 params['model_name'] = model_name
                 mlflow.log_params(params)
-                mlflow.log_metric('accuracy', model.score(X_test, y_test))
+                mlflow.log_metric('accuracy', model.score(self.X_test, self.y_test))
         elif library == 'xgboost':
             with mlflow.start_run():
-                dtrain = xgb.DMatrix(X_train, label=y_train)
-                dtest = xgb.DMatrix(X_test, label=y_test)
+                dtrain = xgb.DMatrix(self.X_train, label=self.y_train)
+                dtest = xgb.DMatrix(self.X_test, label=self.y_test)
                 model = xgb.train(params, dtrain, evals=[(dtrain, 'train')])
                 y_proba = model.predict(dtest)
                 y_pred = y_proba.argmax(axis=1)
-                loss = log_loss(y_test, y_proba)
-                acc = accuracy_score(y_test, y_pred)
+                loss = log_loss(self.y_test, y_proba)
+                acc = accuracy_score(self.y_test, y_pred)
                 mlflow.log_metrics({'log_loss': loss, 'accuracy': acc})
                 mlflow.log_param('model_name', model_name)
                 # return acc
@@ -439,18 +529,13 @@ class DaVinciCode():
     #     # normalize_hyp_keys(params)
     #     update()
 
-    def experiment(self, library, Model, params, X_train, X_test, y_train, y_test):
-        model_name = ""
-        if Model:
-            model_name = Model.__name__
-        else:
-            model_name = library
-        self.run_experiment(library, Model, model_name, params, X_train, X_test, y_train, y_test)
+    def experiment(self, library, model, params):
+        self.run_experiment(library, model, params)
         self.update()
 
-    def __init__(self, port_in):
+    def __init__(self, port, X_test=None, X_train=None, y_train=None, y_test=None):
 
-        self.port = port_in
+        self.port = port
 
         warnings.filterwarnings("ignore")
 
@@ -458,7 +543,16 @@ class DaVinciCode():
         self.logs_path = '/'.join(traceback.extract_stack()[-2][0].split("/")[:len(path.split('/'))-1])
 
         mlflow.xgboost.autolog()
-        if len(os.listdir(self.logs_path + "mlruns/0")) == 2 and 'meta.yaml' in os.listdir(self.logs_path + "mlruns/0") and '.DS_Store' in os.listdir(self.logs_path + "mlruns/0"):
+
+        self.X_train = X_train
+        self.X_test = X_test
+        self.y_train = y_train
+        self.y_test = y_test
+        
+        if not os.path.isdir(self.logs_path + "mlruns"):
+            return
+
+        if len(os.listdir(self.logs_path + "mlruns/0")) == 2 and 'meta.yaml' in os.listdir(self.logs_path + "mlruns/0"):
             # empty autologs dir
             return
         # if ut_pair[0].count() > 0:
