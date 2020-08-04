@@ -46,6 +46,7 @@ class DaVinciCode():
     port = 0
     pc = 0
     id_updater = 0
+    recommendations = []
 
     X_test = 0
     X_train = 0
@@ -72,8 +73,8 @@ class DaVinciCode():
                 if 'model_name' in j:
                     model_name = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
                     continue
-                if 'kernel' in j:
-                    continue
+                # if 'kernel' in j:
+                #     continue
                 model_params[j] = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
             
             row['model_params'] = model_params
@@ -252,9 +253,11 @@ class DaVinciCode():
                 for i, g in ut.groupby(col_name):
                     data_key = g[col_name].iloc[0]
                     data[data_key] = {}
-
+                    
         self.add_rec(['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p)
+        self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p])
         self.add_rec(['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p)
+        self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p])
 
         data = copy.deepcopy(self.ut_p)
 
@@ -330,6 +333,7 @@ class DaVinciCode():
                 )
             ], style={'width': '78%', 'height': '500px', 'float':'left'}),
             html.Div([
+                html.H3('Sand Box', id='sandboxtext'),
                 dcc.Textarea(
                     id='sandbox',
                     value='',
@@ -480,6 +484,9 @@ class DaVinciCode():
         self.grab_autologs()
         self.create_hierarchy()
         self.format_icicle_data()
+        for rec in self.recommendations:
+            rec[2] = self.ut_p
+            self.add_rec(*tuple(rec))
         self.update_available = True
         if self.display == False:
             self.init_app()

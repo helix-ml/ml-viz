@@ -30,6 +30,9 @@ export default class Icicle extends Component {
       let color_padding = (this.props.high - this.props.low) * 0.5;
       const color = d3.scaleSequential(d3.interpolate("red", "blue")).domain([this.props.low - color_padding, this.props.high + color_padding]);
       return color(d.color);
+    }} border= {(d) => {
+      console.log(d.border);
+      return d.border;
     }} height={300} width={750} onClick = {(e) => {
       console.log(e);
       let pathBuilder = "";
@@ -40,6 +43,17 @@ export default class Icicle extends Component {
           break;
         }
         current = current.parent;
+      }
+
+      if(typeof e.color === 'string') {
+        pathBuilder = pathBuilder + " recommendationval";
+        // get the value from the DOM node
+        const newValue = pathBuilder;
+        // update the state!
+        this.props.setProps({
+          value: newValue
+        });
+        return;
       }
 
       var traverser = e;
@@ -63,11 +77,8 @@ export default class Icicle extends Component {
         }
       }
 
-      if(typeof e.color === 'string') {
-        pathBuilder = pathBuilder + " recommendationval";
-      } else {
-        this.icicleref.zoomToNode(e);
-      }
+      this.icicleref.zoomToNode(e);
+
       // get the value from the DOM node
       const newValue = pathBuilder;
       // update the state!
@@ -81,10 +92,6 @@ export default class Icicle extends Component {
       // console.log(this.icicleref)
     }}/>;
   }
-
-  // render() {
-  //   return <div id={this.props.id} ref={el => {this.el = el}} />;
-  // }
 }
 
 Icicle.propTypes = {
