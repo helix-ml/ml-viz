@@ -99,7 +99,9 @@ class DaVinciCode():
         for model_iter in self.ut_pair.model.unique():
             hyperparams_df = pd.DataFrame(self.ut_pair[self.ut_pair.model == model_iter].model_params.to_list())
             hp_candidates = sorted(list(self.ut_pair[self.ut_pair.model == model_iter].model_params.to_list()[0].keys()), key=sorting_criteria)
-            hp_candidates = [i for i in hp_candidates if len(hyperparams_df[i].unique()) > 1]
+
+            # uncomment for less verbosity (ie don't show hyperparameters that have only 1 unique value (for comparison purposes))
+            # hp_candidates = [i for i in hp_candidates if len(hyperparams_df[i].unique()) > 1]
             hp_key[model_iter] = hp_candidates
             if len(hp_candidates) > self.max_len_candidates:
                 self.max_len_candidates = len(hp_candidates)
@@ -114,10 +116,10 @@ class DaVinciCode():
                 return hp_key[row.model][current_index] + "=" + hp_value
             return None
 
-
         for i in range(self.max_len_candidates):
             current_index = i
             self.ut_pair[str(i) + "_order_hyp"] = self.ut_pair[['model', 'rid']].apply(hp_viz_creator,axis=1)
+
 
     def format_icicle_data(self):
 
@@ -169,7 +171,7 @@ class DaVinciCode():
         if path == ['main']:
             return dictionary
         current = dictionary
-        stack = path
+        stack = copy.deepcopy(path)
         stack.reverse()
         stack.pop()
         while(len(stack) > 0):
@@ -253,7 +255,6 @@ class DaVinciCode():
                 for i, g in ut.groupby(col_name):
                     data_key = g[col_name].iloc[0]
                     data[data_key] = {}
-                    
         self.add_rec(['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p)
         self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p])
         self.add_rec(['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p)
