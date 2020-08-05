@@ -76,6 +76,12 @@ class DaVinciCode():
                 # if 'kernel' in j:
                 #     continue
                 model_params[j] = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
+
+            highlighted_file = open(self.logs_path + 'mlruns/0/' + i + '/tags/highlighted').read()
+            if "True" in highlighted_file:
+                row['highlighted'] = True
+            elif "False" in highlighted_file:
+                row['highlighted'] = False
             
             row['model_params'] = model_params
             row['model'] = model_name
@@ -122,7 +128,6 @@ class DaVinciCode():
 
 
     def format_icicle_data(self):
-
         self.hierarchy_path = ['model'] + [str(i) + '_order_hyp' for i in range(self.max_len_candidates)]
         self.ut_p = self.ut_pair[self.hierarchy_path + ['accuracy']]
         def recur_dictify(frame):
@@ -165,6 +170,20 @@ class DaVinciCode():
         children_ut_p, color = recur_hierarch(self.ut_p)
         self.ut_p = {'name': 'main', 'color': color, 'children': children_ut_p}
 
+    def attach_subtree(self, path, current):
+        if path == []:
+            return 0
+        searcher = path.pop()
+        subtree = {'name': searcher, 'color': 'grey'}
+        recurs = self.attach_subtree(path, subtree)
+        if recurs == 0:
+            subtree['size'] = 1
+        else:
+            subtree['children'] = [recurs]
+        current['children'].append(subtree)
+        return subtree
+        
+
     ## Tree Functions
     # ok this one isn't recursion but the others are
     def grab_node(self, path, dictionary):
@@ -176,10 +195,14 @@ class DaVinciCode():
         stack.pop()
         while(len(stack) > 0):
             searcher = stack.pop()
+            found = False
             for i in current['children']:
                 if i['name'] == searcher:
                     current = i
+                    found = True
                     break
+            if not found:
+                return self.attach_subtree(stack + [searcher], current)
         return current
 
     def count_leaves(dictionary):
@@ -470,7 +493,7 @@ class DaVinciCode():
                     except ValueError:
                         params_rec[i.split("=")[0]] = i.split("=")[1]
 
-                code = "app.experiment(library = 'sklearn', model = " + model_name + ", params = " + str(params_rec) + ")"
+                code = "app.experiment(library = 'sklearn', model = " + model_name + ", params = " + str(params_rec) + ", highlighted = True)"
                 return code
             else:
                 raise PreventUpdate
@@ -495,30 +518,31 @@ class DaVinciCode():
             self.app.run_server(mode='inline', port=self.port, width=1000)
         # print("updated")
 
-    def run_experiment(self, library, Model, params):
+    def run_experiment(self, library, Model, params, highlighted=False):
         model_name = ""
         if Model:
             model_name = Model.__name__
         else:
             model_name = library
-        if library == 'sklearn':
-            with mlflow.start_run():
-                model = Model(**params).fit(self.X_train, self.y_train)
-                params['model_name'] = model_name
-                mlflow.log_params(params)
-                mlflow.log_metric('accuracy', model.score(self.X_test, self.y_test))
-        elif library == 'xgboost':
-            with mlflow.start_run():
-                dtrain = xgb.DMatrix(self.X_train, label=self.y_train)
-                dtest = xgb.DMatrix(self.X_test, label=self.y_test)
-                model = xgb.train(params, dtrain, evals=[(dtrain, 'train')])
-                y_proba = model.predict(dtest)
-                y_pred = y_proba.argmax(axis=1)
-                loss = log_loss(self.y_test, y_proba)
-                acc = accuracy_score(self.y_test, y_pred)
-                mlflow.log_metrics({'log_loss': loss, 'accuracy': acc})
-                mlflow.log_param('model_name', model_name)
-                # return acc
+        
+        with mlflow.start_run():
+            mlflow.set_tag("highlighted", highlighted)
+            if library == 'sklearn':
+                    model = Model(**params).fit(self.X_train, self.y_train)
+                    params['model_name'] = model_name
+                    mlflow.log_params(params)
+                    mlflow.log_metric('accuracy', model.score(self.X_test, self.y_test))
+            elif library == 'xgboost':
+                    dtrain = xgb.DMatrix(self.X_train, label=self.y_train)
+                    dtest = xgb.DMatrix(self.X_test, label=self.y_test)
+                    model = xgb.train(params, dtrain, evals=[(dtrain, 'train')])
+                    y_proba = model.predict(dtest)
+                    y_pred = y_proba.argmax(axis=1)
+                    loss = log_loss(self.y_test, y_proba)
+                    acc = accuracy_score(self.y_test, y_pred)
+                    mlflow.log_metrics({'log_loss': loss, 'accuracy': acc})
+                    mlflow.log_param('model_name', model_name)
+                    # return acc
 
     def normalize_row_keys(params, goal):
         for i in goal.keys():
@@ -537,8 +561,8 @@ class DaVinciCode():
     #     # normalize_hyp_keys(params)
     #     update()
 
-    def experiment(self, library, model, params):
-        self.run_experiment(library, model, params)
+    def experiment(self, library, model, params, highlighted=False):
+        self.run_experiment(library, model, params, highlighted)
         self.update()
 
     def __init__(self, port, X_test=None, X_train=None, y_train=None, y_test=None):

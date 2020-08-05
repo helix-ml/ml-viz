@@ -31,8 +31,9 @@ export default class Icicle extends Component {
       const color = d3.scaleSequential(d3.interpolate("red", "blue")).domain([this.props.low - color_padding, this.props.high + color_padding]);
       return color(d.color);
     }} border= {(d) => {
-      console.log(d.border);
       return d.border;
+    }} borderWidth = {(d) => {
+      return d.borderWidth;
     }} height={300} width={750} onClick = {(e) => {
       console.log(e);
       let pathBuilder = "";

@@ -9,16 +9,15 @@ app = dash.Dash(__name__)
 data = {
       'name': 'main',
       'color': 'magenta',
-      'border': 'magenta',
       'children': [{
         'name': 'a',
         'color': 'green',
-        'border': 'magenta',
         'size': 1
       },{
         'name': 'b',
         'color': 'red',
-        'border': 'magenta',
+        'border': 'grey',
+        'borderWidth': '1%',
         'children': [{
           'name': 'ba',
           'color': 0.8,

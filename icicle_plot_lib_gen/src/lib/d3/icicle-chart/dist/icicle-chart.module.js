@@ -105,6 +105,11 @@ var icicle = Kapsule({
         return 'white';
       }
     },
+    borderWidth: {
+      "default": function _default(d) {
+        return "1%";
+      }
+    },
     minSegmentWidth: {
       "default": .8
     },
@@ -267,6 +272,7 @@ var icicle = Kapsule({
     var nameOf = accessorFn(state.label);
     var colorOf = accessorFn(state.color);
     var strokeOf = accessorFn(state.border);
+    var strokeWidthOf = accessorFn(state.borderWidth);
     var animate = !state.skipTransitionsOnce;
     state.skipTransitionsOnce = false;
     var transition$1 = transition().duration(animate ? TRANSITION_DURATION : 0);
@@ -374,6 +380,8 @@ var icicle = Kapsule({
       return colorOf(d.data, d.parent);
     }).style('stroke', function (d) {
       return strokeOf(d.data, d.parent);
+    }).style('stroke-width', function (d) {
+      return strokeWidthOf(d.data, d.parent);
     });
     allCells.select('g.label-container').style('display', state.showLabels ? null : 'none').transition(transition$1).attr('transform', function (d) {
       return "translate(\n          ".concat(state.orientation === 'lr' ? 4 : state.orientation === 'rl' ? x1(d) - x0(d) - 4 : (x1(d) - x0(d)) / 2, ",\n          ").concat((y1(d) - y0(d)) / 2, "\n        )");
