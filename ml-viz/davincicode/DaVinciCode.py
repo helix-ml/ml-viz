@@ -100,6 +100,7 @@ class DaVinciCode():
         def sorting_criteria(s):
             return len(hyperparams_df[s].unique())
 
+        # key is model, value is hyperparameters
         hp_key = {}
         
         for model_iter in self.ut_pair.model.unique():
@@ -120,14 +121,18 @@ class DaVinciCode():
 
         current_index = 0
         def hp_viz_creator(row):
+            # if this model has a hyperparameter for this order/level in the hierarchy
             if current_index < len(hp_key[row.model]):
                 hp_value = str(hyperparams_df[hyperparams_df.rid == row.rid][hp_key[row.model][current_index]].tolist()[0])
+                # if this is the leaf node and is highlighted, tag it
+                if current_index == len(hp_key[row.model]) - 1 and row['highlighted'] == True:
+                    return hp_key[row.model][current_index] + "=" + hp_value + " highlighted"
                 return hp_key[row.model][current_index] + "=" + hp_value
             return None
 
         for i in range(self.max_len_candidates):
             current_index = i
-            self.ut_pair[str(i) + "_order_hyp"] = self.ut_pair[['model', 'rid']].apply(hp_viz_creator,axis=1)
+            self.ut_pair[str(i) + "_order_hyp"] = self.ut_pair[['model', 'rid', 'highlighted']].apply(hp_viz_creator,axis=1)
 
 
     def format_icicle_data(self):
@@ -167,7 +172,11 @@ class DaVinciCode():
                         self.low_color = color
                     if color > self.high_color:
                         self.high_color = color
-                    children.append({'name': key, 'color': color, 'size': 1})
+                    child = {'name': key.replace(" highlighted", ""), 'color': color, 'size': 1}
+                    if " highlighted" in key:
+                        child['border'] = "grey"
+                        child['borderWidth'] = "0.35%"
+                    children.append(child)
             return children, max(colors)
 
         children_ut_p, color = recur_hierarch(self.ut_p)
@@ -188,7 +197,6 @@ class DaVinciCode():
         
 
     ## Tree Functions
-    # ok this one isn't recursion but the others are
     def grab_node(self, path, dictionary):
         if path == ['main']:
             return dictionary
@@ -264,6 +272,13 @@ class DaVinciCode():
         if 'children' not in current:
             current['children'] = []
         current['children'].append(node)
+
+    def highlight_rec(self, row):
+        node = grab_node()
+        return row
+
+    def highlight_executed_recs(self, dictionary):
+        ut_pair[ut_pair['highlighted'] == True].apply(lambda row: self.grab_node(dictionary), axis=1)
 
     def execute_code(self, n_clicks, code):
         exec(code.replace("app.", "self."))
@@ -393,6 +408,7 @@ class DaVinciCode():
                 # print("update vailable")
                 self.id_updater+=1
                 self.update_available = False
+
             # id is dictionary for Dash pattern matching callbacks
             return icicle_plot.Icicle(
                 id={'role': 'icicle_plot_fig', 'index': self.id_updater},
@@ -495,6 +511,8 @@ class DaVinciCode():
                     except ValueError:
                         params_rec[i.split("=")[0]] = i.split("=")[1]
 
+                    if params_rec[i.split("=")[0]].is_integer():
+                        params_rec[i.split("=")[0]] = int(params_rec[i.split("=")[0]])
                 code = "app.experiment(library = 'sklearn', model = " + model_name + ", params = " + str(params_rec) + ", highlighted = True)"
                 return code
             else:
@@ -583,8 +601,8 @@ class DaVinciCode():
         self.y_train = y_train
         self.y_test = y_test
 
-        self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p])
-        self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p])
+        self.recommendations.append([['main', 'MLPClassifier', 'max_iter=300'], 'alpha=0.1', self.ut_p])
+        self.recommendations.append([['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p])
         
         if not os.path.isdir(self.logs_path + "mlruns"):
             return
