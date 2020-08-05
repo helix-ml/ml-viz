@@ -103,11 +103,14 @@ class DaVinciCode():
         hp_key = {}
         
         for model_iter in self.ut_pair.model.unique():
+            # get relevant recommendations to determine uniqueness of hyperparameter values
+            relevant_recs = ['/'.join(rec[0] + [rec[1]]) for rec in self.recommendations if model_iter in rec[0]]
             hyperparams_df = pd.DataFrame(self.ut_pair[self.ut_pair.model == model_iter].model_params.to_list())
             hp_candidates = sorted(list(self.ut_pair[self.ut_pair.model == model_iter].model_params.to_list()[0].keys()), key=sorting_criteria)
 
-            # uncomment for less verbosity (ie don't show hyperparameters that have only 1 unique value (for comparison purposes))
-            # hp_candidates = [i for i in hp_candidates if len(hyperparams_df[i].unique()) > 1]
+            # filter out hyperparameters that have only 1 unique value across all experiments (for this model), and don't have any recommendations with
+            # the same hyperparameters either
+            hp_candidates = [i for i in hp_candidates if len(hyperparams_df[i].unique()) > 1 or any(i in rec for rec in relevant_recs)]
             hp_key[model_iter] = hp_candidates
             if len(hp_candidates) > self.max_len_candidates:
                 self.max_len_candidates = len(hp_candidates)
@@ -272,16 +275,15 @@ class DaVinciCode():
         app.css.config.serve_locally = True
         app.scripts.config.serve_locally = True
 
+        # self.add_rec(['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p)
+        # self.add_rec(['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p)
+
         def df_to_dict(ut):
             data = {}
             for col_name in self.hierarchy_path:
                 for i, g in ut.groupby(col_name):
                     data_key = g[col_name].iloc[0]
                     data[data_key] = {}
-        self.add_rec(['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p)
-        self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p])
-        self.add_rec(['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p)
-        self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p])
 
         data = copy.deepcopy(self.ut_p)
 
@@ -580,6 +582,9 @@ class DaVinciCode():
         self.X_test = X_test
         self.y_train = y_train
         self.y_test = y_test
+
+        self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p])
+        self.recommendations.append([['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p])
         
         if not os.path.isdir(self.logs_path + "mlruns"):
             return
