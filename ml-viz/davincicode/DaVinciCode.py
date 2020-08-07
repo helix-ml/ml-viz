@@ -181,7 +181,7 @@ class DaVinciCode():
                     child = {'name': key.replace(" highlighted", ""), 'color': color, 'size': 1}
                     if " highlighted" in key:
                         child['border'] = "grey"
-                        child['borderWidth'] = "0.35%"
+                        child['borderWidth'] = "0.45%"
                     children.append(child)
             return children, max(colors)
 
@@ -338,6 +338,9 @@ class DaVinciCode():
         ut_pair_numeric = self.ut_pair.apply(make_ints, axis=1)
 
         pc = go.Figure(data=[go.Scatter(x=[], y=[])])
+        if self.ut_pair is not 0 and not self.ut_pair.empty:
+            pc = px.parallel_coordinates(ut_pair_numeric.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
+                                    color_continuous_scale='RdBu', height=350)
         pc_o = pc
 
         marks = {}
