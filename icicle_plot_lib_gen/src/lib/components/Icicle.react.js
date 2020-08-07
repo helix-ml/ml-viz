@@ -57,6 +57,12 @@ export default class Icicle extends Component {
         return;
       }
 
+      if(!e.hasOwnProperty('children')) {
+        return;
+      }
+
+      var hasMoreThanOneChild = false;
+
       var traverser = e;
       var high = -1.0;
       var low = 2.0;
@@ -65,6 +71,9 @@ export default class Icicle extends Component {
       while(stack.length > 0) {
         traverser = stack.pop();
         if (traverser.children) {
+          if(traverser.children.length > 1) {
+            hasMoreThanOneChild = true;
+          }
           for(let i=0; i<traverser.children.length; i++) {
             stack.push(traverser.children[i]);
           }
@@ -76,6 +85,10 @@ export default class Icicle extends Component {
             low = traverser.color;
           }
         }
+      }
+
+      if(!hasMoreThanOneChild) {
+        return;
       }
 
       this.icicleref.zoomToNode(e);
