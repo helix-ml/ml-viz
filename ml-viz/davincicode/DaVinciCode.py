@@ -4,6 +4,7 @@ import json
 import copy
 import warnings
 import traceback
+import shutil
 
 import pandas as pd
 import numpy as np
@@ -14,6 +15,7 @@ import plotly.graph_objects as go
 from jupyter_dash import JupyterDash
 import dash
 import dash_core_components as dcc
+import dash_bootstrap_components as dbc
 import dash_html_components as html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, ALL, MATCH, State
@@ -150,6 +152,10 @@ class DaVinciCode():
             d = {k: recur_dictify(g.iloc[:,1:]) for k,g in grouped}
             return d
         self.ut_p = recur_dictify(self.ut_p)
+
+        # now remove the highlighted tags from the pandas dataframe (so it doesn't mess up the parallel coordinates plot)
+        self.ut_pair = self.ut_pair.replace(" highlighted", "", regex=True)
+        print(self.ut_pair)
         self.low_color = 2.0
         self.high_color = -1.0
         def recur_hierarch(frame):
@@ -192,7 +198,11 @@ class DaVinciCode():
             subtree['size'] = 1
         else:
             subtree['children'] = [recurs]
+        
+        if 'children' not in current:
+            current['children'] = []
         current['children'].append(subtree)
+        print(subtree)
         return subtree
         
 
@@ -207,13 +217,18 @@ class DaVinciCode():
         while(len(stack) > 0):
             searcher = stack.pop()
             found = False
-            for i in current['children']:
-                if i['name'] == searcher:
-                    current = i
-                    found = True
-                    break
+            if 'children' in current:
+                for i in current['children']:
+                    if i['name'] == searcher:
+                        current = i
+                        found = True
+                        break
             if not found:
-                return self.attach_subtree(stack + [searcher], current)
+                # print(stack + [searcher])
+                # print(current)
+                # print()
+                self.attach_subtree(stack + [searcher], current)
+                return self.grab_node(path, dictionary)
         return current
 
     def count_leaves(dictionary):
@@ -361,7 +376,6 @@ class DaVinciCode():
                     id='pc',
                     figure=pc
                 ),
-                html.Div(id='output'),
                 dcc.Interval(
                     id='interval-component',
                     interval=1*1000, # in milliseconds
@@ -374,14 +388,21 @@ class DaVinciCode():
                 )
             ], style={'width': '78%', 'height': '500px', 'float':'left'}),
             html.Div([
-                html.H3('Sand Box', id='sandboxtext'),
-                dcc.Textarea(
-                    id='sandbox',
-                    value='',
-                    style={'height': 400}
-                ),
-                html.Button('Execute', id='execute-button', style=button_style)
-            ], style={'margin-left': '5%'})
+                    html.H3('Sand Box', id='sandboxtext'),
+                    dcc.Textarea(
+                        id='sandbox',
+                        value='',
+                        style={'height': 400}
+                    ),
+                    dbc.Spinner(
+                        id="loading",
+                        children=html.Div([
+                            html.Button('Execute', id='execute-button', style=button_style),
+                            html.Div(id='output')
+                        ]),
+                        spinner_style={"width": "3rem", "height": "3rem"}
+                    )
+                ], style={'margin-left': '5%'})
         ])
 
         @app.callback(
@@ -395,15 +416,17 @@ class DaVinciCode():
             
             # revert to original state
             data = copy.deepcopy(self.ut_p)
-            
-            # delete entries
-            self.remove_nodes_out_of_range(rangeData[0], rangeData[1], data)
-            filtered_accs = self.ut_pair.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))['accuracy']
-            self.low_color = filtered_accs.min()
-            self.high_color = filtered_accs.max()
-            if rangeData != self.rangeDataOld:
-                self.id_updater+=1
-                self.rangeDataOld = rangeData
+            print(data)
+            if not self.ut_pair.empty:
+                # delete entries
+                self.remove_nodes_out_of_range(rangeData[0], rangeData[1], data)
+                filtered_accs = self.ut_pair.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))['accuracy']
+                self.low_color = filtered_accs.min()
+                self.high_color = filtered_accs.max()
+                if rangeData != self.rangeDataOld:
+                    self.id_updater+=1
+                    self.rangeDataOld = rangeData
+
             if self.update_available:
                 # print("update vailable")
                 self.id_updater+=1
@@ -427,18 +450,22 @@ class DaVinciCode():
                 Input('interval-component2', 'n_intervals')
             ])
         def update_pc(clickData, rangeData, n):
+            if self.ut_pair.empty:
+                return go.Figure(data=[go.Scatter(x=[], y=[])])
             trigger_context = dash.callback_context.triggered[0]['prop_id']
             if len(dash.callback_context.triggered) <= 1 and self.update_available == False and (trigger_context == 'interval-component2.n_intervals'):
                 raise PreventUpdate
             
-            # no update available, don't refresh
-            # if not update_available:
-            #     raise Exception("300")
+            ut_pair_copy = self.ut_pair
+
             if len(clickData) == 0:
+                if self.update_available:
+                    pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
+                                    color_continuous_scale='RdBu', height=350)
+                    return pc
                 raise PreventUpdate
                 # return self.pc
                 # revert to original state
-            ut_pair_copy = self.ut_pair
             # delete entries
             ut_pair_copy = ut_pair_copy.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))
                 
@@ -478,7 +505,7 @@ class DaVinciCode():
                 selected_df = selected_df.apply(make_ints, axis=1)
                 self.pc = px.parallel_coordinates(selected_df, color="accuracy", dimensions=self.hierarchy_path[subset_counter:],
                                         labels=labels_pc, color_continuous_scale='RdBu', height=350)
-                
+                print(ut_pair_copy.apply(make_ints, axis=1))
                 return self.pc
             self.pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
                                     color_continuous_scale='RdBu', height=350)
@@ -490,6 +517,7 @@ class DaVinciCode():
         def update_sandbox(clickData):
             if len(clickData) == 0:
                 raise PreventUpdate
+
             if isinstance(clickData, list):
                 clickData = clickData[0]
             if 'recommendationval' in clickData:
@@ -518,6 +546,7 @@ class DaVinciCode():
             else:
                 raise PreventUpdate
 
+        # execute button handler
         app.callback(Output('output', 'value'),
             [Input('execute-button', 'n_clicks')],
             [State('sandbox', 'value')])(self.execute_code)
@@ -584,6 +613,20 @@ class DaVinciCode():
     def experiment(self, library, model, params, highlighted=False):
         self.run_experiment(library, model, params, highlighted)
         self.update()
+
+    def reset(self):
+        shutil.rmtree(self.logs_path + "mlruns")
+        # self.recommendations = []
+        self.ut_pair = pd.DataFrame()
+        self.ut_p = {"name": "main", "color": "grey", "children": []}
+        for rec in self.recommendations:
+            rec[2] = self.ut_p
+            self.add_rec(*tuple(rec))
+        self.update_available = True
+        if self.display == False:
+            self.init_app()
+            self.display = True
+            self.app.run_server(mode='inline', port=self.port, width=1000)
 
     def __init__(self, port, X_test=None, X_train=None, y_train=None, y_test=None):
 
