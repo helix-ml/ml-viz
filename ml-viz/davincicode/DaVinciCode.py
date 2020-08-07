@@ -337,8 +337,7 @@ class DaVinciCode():
 
         ut_pair_numeric = self.ut_pair.apply(make_ints, axis=1)
 
-        pc = px.parallel_coordinates(ut_pair_numeric, color="accuracy", dimensions=self.hierarchy_path,
-                                    color_continuous_scale='RdBu', height=350)
+        pc = go.Figure(data=[go.Scatter(x=[], y=[])])
         pc_o = pc
 
         marks = {}
@@ -400,7 +399,8 @@ class DaVinciCode():
                             html.Button('Execute', id='execute-button', style=button_style),
                             html.Div(id='output')
                         ]),
-                        type="cube"
+                        type="cube",
+                        fullscreen=True
                     )
                 ], style={'margin-left': '5%'})
         ])
@@ -622,7 +622,8 @@ class DaVinciCode():
         self.update()
 
     def reset(self):
-        shutil.rmtree(self.logs_path + "mlruns")
+        if os.path.isdir(self.logs_path + "mlruns"):
+            shutil.rmtree(self.logs_path + "mlruns")
         # self.recommendations = []
         self.ut_pair = pd.DataFrame()
         self.ut_p = {"name": "main", "color": "grey", "children": []}
@@ -653,11 +654,15 @@ class DaVinciCode():
 
         self.recommendations.append([['main', 'MLPClassifier', 'max_iter=300'], 'alpha=0.1', self.ut_p])
         self.recommendations.append([['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p])
-        
+
         if not os.path.isdir(self.logs_path + "mlruns"):
+            if self.recommendations:
+                self.reset()
             return
 
         if len(os.listdir(self.logs_path + "mlruns/0")) == 2 and 'meta.yaml' in os.listdir(self.logs_path + "mlruns/0"):
+            if self.recommendations:
+                self.reset()
             # empty autologs dir
             return
         # if ut_pair[0].count() > 0:
