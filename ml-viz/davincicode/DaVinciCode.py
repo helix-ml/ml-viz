@@ -557,11 +557,13 @@ class DaVinciCode():
         self.grab_autologs()
         self.create_hierarchy()
         self.format_icicle_data()
+
+        ## Remove Executed Recommendations
         hyperparameters = self.ut_pair.drop(['rid', 'accuracy', 'model_params', 'highlighted'], axis=1).values.tolist()
         for rec in self.recommendations:
             recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
             ## inefficient
-            if any(all(item in recommendation_path for item in ut_list) for ut_list in hyperparameters):
+            if any(all(item in recommendation_path for item in ut_list if item is not None) for ut_list in hyperparameters):
                 continue
             rec[2] = self.ut_p
             self.add_rec(*tuple(rec))
