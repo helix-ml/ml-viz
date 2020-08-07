@@ -155,7 +155,7 @@ class DaVinciCode():
 
         # now remove the highlighted tags from the pandas dataframe (so it doesn't mess up the parallel coordinates plot)
         self.ut_pair = self.ut_pair.replace(" highlighted", "", regex=True)
-        print(self.ut_pair)
+        # print(self.ut_pair)
         self.low_color = 2.0
         self.high_color = -1.0
         def recur_hierarch(frame):
@@ -202,7 +202,7 @@ class DaVinciCode():
         if 'children' not in current:
             current['children'] = []
         current['children'].append(subtree)
-        print(subtree)
+        # print(subtree)
         return subtree
         
 
@@ -394,13 +394,13 @@ class DaVinciCode():
                         value='',
                         style={'height': 400}
                     ),
-                    dbc.Spinner(
+                    dcc.Loading(
                         id="loading",
                         children=html.Div([
                             html.Button('Execute', id='execute-button', style=button_style),
                             html.Div(id='output')
                         ]),
-                        spinner_style={"width": "3rem", "height": "3rem"}
+                        type="cube"
                     )
                 ], style={'margin-left': '5%'})
         ])
@@ -416,7 +416,7 @@ class DaVinciCode():
             
             # revert to original state
             data = copy.deepcopy(self.ut_p)
-            print(data)
+            # print(data)
             if not self.ut_pair.empty:
                 # delete entries
                 self.remove_nodes_out_of_range(rangeData[0], rangeData[1], data)
@@ -505,7 +505,7 @@ class DaVinciCode():
                 selected_df = selected_df.apply(make_ints, axis=1)
                 self.pc = px.parallel_coordinates(selected_df, color="accuracy", dimensions=self.hierarchy_path[subset_counter:],
                                         labels=labels_pc, color_continuous_scale='RdBu', height=350)
-                print(ut_pair_copy.apply(make_ints, axis=1))
+                # print(ut_pair_copy.apply(make_ints, axis=1))
                 return self.pc
             self.pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
                                     color_continuous_scale='RdBu', height=350)
@@ -557,7 +557,12 @@ class DaVinciCode():
         self.grab_autologs()
         self.create_hierarchy()
         self.format_icicle_data()
+        hyperparameters = self.ut_pair.drop(['rid', 'accuracy', 'model_params', 'highlighted'], axis=1).values.tolist()
         for rec in self.recommendations:
+            recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
+            ## inefficient
+            if any(all(item in recommendation_path for item in ut_list) for ut_list in hyperparameters):
+                continue
             rec[2] = self.ut_p
             self.add_rec(*tuple(rec))
         self.update_available = True
