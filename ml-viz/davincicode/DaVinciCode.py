@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from jupyter_dash import JupyterDash
 import dash
 import dash_core_components as dcc
-import dash_bootstrap_components as dbc
+# import dash_bootstrap_components as dbc
 import dash_html_components as html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, ALL, MATCH, State
@@ -180,7 +180,7 @@ class DaVinciCode():
                         self.high_color = color
                     child = {'name': key.replace(" highlighted", ""), 'color': color, 'size': 1}
                     if " highlighted" in key:
-                        child['border'] = "grey"
+                        child['border'] = "orange"
                         child['borderWidth'] = "0.45%"
                     children.append(child)
             return children, max(colors)
@@ -357,7 +357,7 @@ class DaVinciCode():
             "font-size": 16, 
             "margin": "4px 2px", 
             "cursor": "pointer",
-            "width": "18%"
+            "width": "150px"
             }
 
         app.layout = html.Div([
@@ -388,7 +388,7 @@ class DaVinciCode():
                     interval=1*1000, # in milliseconds
                     n_intervals=0
                 )
-            ], style={'width': '78%', 'height': '500px', 'float':'left'}),
+            ], style={'width': '80%', 'height': '500px', 'float':'left'}),
             html.Div([
                     html.H3('Sand Box', id='sandboxtext'),
                     dcc.Textarea(
@@ -396,17 +396,18 @@ class DaVinciCode():
                         value='',
                         style={'height': 400}
                     ),
-                    dcc.Loading(
-                        id="loading",
-                        children=html.Div([
-                            html.Button('Execute', id='execute-button', style=button_style),
-                            html.Div(id='output')
-                        ]),
-                        type="cube",
-                        fullscreen=True
-                    )
+                    html.Div([
+                        dcc.Loading(
+                            id="loading",
+                            children=html.Div([
+                                html.Button('Execute', id='execute-button', style=button_style),
+                                html.Div(id='output')
+                            ]),
+                            type="circle"
+                        )
+                    ], style= {'right': 37, 'position': 'absolute'})
                 ], style={'margin-left': '5%'})
-        ])
+        ], style={'height': '633px', 'overflow': 'hidden'})
 
         @app.callback(
             Output('icicle-wrap', 'children'),
@@ -544,7 +545,7 @@ class DaVinciCode():
 
                     if params_rec[i.split("=")[0]].is_integer():
                         params_rec[i.split("=")[0]] = int(params_rec[i.split("=")[0]])
-                code = "app.experiment(library = 'sklearn', model = " + model_name + ", params = " + str(params_rec) + ", highlighted = True)"
+                code = "app.experiment(\nlibrary = 'sklearn',\nmodel = " + model_name + ",\nparams = \n" + str(params_rec).replace('{', '{\n  ').replace(',', ',\n ').replace('}', '\n}') + ",\nhighlighted = True)"
                 return code
             else:
                 raise PreventUpdate
@@ -663,7 +664,7 @@ class DaVinciCode():
                 self.reset()
             return
 
-        if len(os.listdir(self.logs_path + "mlruns/0")) == 2 and 'meta.yaml' in os.listdir(self.logs_path + "mlruns/0"):
+        if all(['.' in fileD for fileD in os.listdir(self.logs_path + "mlruns/0")]):
             if self.recommendations:
                 self.reset()
             # empty autologs dir
