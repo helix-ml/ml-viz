@@ -558,10 +558,29 @@ class DaVinciCode():
 
         self.app = app
 
+    def organize_recs_hierarchy(self):
+        for i in range(len(self.recommendations)):
+            rec = self.recommendations[i]
+            model = rec[0][1]
+
+            reconstructed_rec = ['main', model]
+
+            model_hyps = self.ut_pair[self.ut_pair['model'] == model].iloc[0]
+            for j in range(self.max_len_candidates):
+                hyp = model_hyps[str(j) + "_order_hyp"].split("=")[0]
+                for k in rec[0] + [rec[1]]:
+                    if hyp in k:
+                        reconstructed_rec.append(k)
+
+            self.recommendations[i] = [reconstructed_rec[:-1], reconstructed_rec[-1], rec[2]]
+
     def update(self):
         self.grab_autologs()
         self.create_hierarchy()
         self.format_icicle_data()
+
+        if self.ut_p:
+            self.organize_recs_hierarchy()
 
         ## Remove Executed Recommendations
         hyperparameters = self.ut_pair.drop(['rid', 'accuracy', 'model_params', 'highlighted'], axis=1).values.tolist()
@@ -664,7 +683,7 @@ class DaVinciCode():
         self.y_test = y_test
         
         recs = [
-            [['main', 'MLPClassifier', 'max_iter=300'], 'alpha=0.1', self.ut_p],
+            [['main', 'MLPClassifier', 'alpha=0.1'], 'max_iter=300', self.ut_p],
             [['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p]
         ]
 
