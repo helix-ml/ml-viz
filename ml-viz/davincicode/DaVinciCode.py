@@ -385,12 +385,12 @@ class DaVinciCode():
                 ),
                 dcc.Interval(
                     id='interval-component',
-                    interval=100, # in milliseconds
+                    interval=1000, # in milliseconds
                     n_intervals=0
                 ),
                 dcc.Interval(
                     id='interval-component2',
-                    interval=100, # in milliseconds
+                    interval=1000, # in milliseconds
                     n_intervals=0
                 ),
                 dcc.Interval(
@@ -563,6 +563,7 @@ class DaVinciCode():
             Output('execute-button', 'style'),
             [Input('interval-loading', 'n_intervals')])
         def check_execution(n_intervals):
+
             button_style = {
                 "background-color": "#008CBA", 
                 "border": "none", 
@@ -576,14 +577,18 @@ class DaVinciCode():
                 "width": "150px",
                 "border-radius": "5%"
             }
+
+            if not self.running_experiment and not self.running_recommendation:
+                return button_style
+
             if self.running_recommendation:
                 button_style['visibility'] = "hidden"
+                button_style["cursor"] = 'not-allowed'
+                button_style['pointer-events'] = "none"
                 return button_style
 
-            if not self.running_experiment:
-                return button_style
-
-            button_style["disabled"] = True
+            button_style["cursor"] = 'not-allowed'
+            button_style['pointer-events'] = "none"
             button_style["opacity"] = 0.5
             return button_style
 
