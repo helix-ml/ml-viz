@@ -23,13 +23,13 @@ from IPython.display import display, HTML
 
 import sklearn
 from sklearn.metrics import accuracy_score, log_loss
-import xgboost as xgb
 import mlflow
 import mlflow.xgboost
 import mlflow.sklearn
 
 # libraries
 from sklearn.neural_network import MLPClassifier
+import xgboost as xgb
 
 class DaVinciCode():
 
@@ -178,7 +178,7 @@ class DaVinciCode():
                         self.low_color = color
                     if color > self.high_color:
                         self.high_color = color
-                    child = {'name': key.replace(" highlighted", ""), 'color': color, 'size': 1}
+                    child = {'name': key.replace(" highlighted", ""), 'color': round(color, 3), 'size': 1}
                     if " highlighted" in key:
                         child['border'] = "orange"
                         child['borderWidth'] = "0.45%"
@@ -344,7 +344,7 @@ class DaVinciCode():
         pc_o = pc
 
         marks = {}
-        for i in range(0, 100, 5):
+        for i in range(0, 100, 10):
             marks[i/100] = str(i/100)
 
         button_style = {
@@ -357,7 +357,8 @@ class DaVinciCode():
             "font-size": 16, 
             "margin": "4px 2px", 
             "cursor": "pointer",
-            "width": "150px"
+            "width": "150px",
+            "border-radius": "5%"
             }
 
         app.layout = html.Div([
@@ -366,7 +367,7 @@ class DaVinciCode():
                     id='metric-slider',
                     min=0,
                     max=1,
-                    step=0.05,
+                    step=0.01,
                     value=[0, 1],
                     marks=marks
                 ),
@@ -390,7 +391,7 @@ class DaVinciCode():
                 )
             ], style={'width': '80%', 'height': '500px', 'float':'left'}),
             html.Div([
-                    html.H3('Sand Box', id='sandboxtext'),
+                    html.H3('Sand Box', id='sandboxtext', style={"text-align": 'center'}),
                     dcc.Textarea(
                         id='sandbox',
                         value='',
@@ -625,6 +626,12 @@ class DaVinciCode():
         self.run_experiment(library, model, params, highlighted)
         self.update()
 
+    def experiment_batch(self, libraries, models, paramss):
+        if len(libraries) != len(models) or len(libraries) != len(params) or len(models) != len(params):
+            print("error")
+        for i in range(len(models)):
+            self.experiment(libraries[i], models[i], params[i])
+
     def reset(self):
         if os.path.isdir(self.logs_path + "mlruns"):
             shutil.rmtree(self.logs_path + "mlruns")
@@ -655,9 +662,15 @@ class DaVinciCode():
         self.X_test = X_test
         self.y_train = y_train
         self.y_test = y_test
+        
+        recs = [
+            [['main', 'MLPClassifier', 'max_iter=300'], 'alpha=0.1', self.ut_p],
+            [['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p]
+        ]
 
-        self.recommendations.append([['main', 'MLPClassifier', 'max_iter=300'], 'alpha=0.1', self.ut_p])
-        self.recommendations.append([['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p])
+        for rec in recs:
+            if not any(rec[0] == i[0] and rec[1] == i[1] for i in self.recommendations):
+                self.recommendations.append(rec)
 
         if not os.path.isdir(self.logs_path + "mlruns"):
             if self.recommendations:

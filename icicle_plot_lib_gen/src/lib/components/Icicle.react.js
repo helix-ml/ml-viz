@@ -34,6 +34,13 @@ export default class Icicle extends Component {
       return d.border;
     }} borderWidth = {(d) => {
       return d.borderWidth;
+    }} showTooltip = {(d) => {
+      if(!d.hasOwnProperty('children') && typeof d.color !== 'string') {
+        return true;
+      }
+      return false;
+    }} tooltipTitle = {(d) => {
+      return "accuracy: " + d.color; 
     }} height={300} width={750} onClick = {(e) => {
       console.log(e);
       let pathBuilder = "";
