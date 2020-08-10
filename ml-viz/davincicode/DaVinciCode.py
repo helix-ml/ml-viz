@@ -45,6 +45,8 @@ class DaVinciCode():
     logs_path = 0
     update_available = False
     display = False
+    running_experiment = False
+    running_recommendation = False
     port = 0
     pc = 0
     id_updater = 0
@@ -296,7 +298,9 @@ class DaVinciCode():
         ut_pair[ut_pair['highlighted'] == True].apply(lambda row: self.grab_node(dictionary), axis=1)
 
     def execute_code(self, n_clicks, code):
+        self.running_recommendation = True
         exec(code.replace("app.", "self."))
+        self.running_recommendation = False
 
     def init_app(self):
 
@@ -381,12 +385,17 @@ class DaVinciCode():
                 ),
                 dcc.Interval(
                     id='interval-component',
-                    interval=1*1000, # in milliseconds
+                    interval=100, # in milliseconds
                     n_intervals=0
                 ),
                 dcc.Interval(
                     id='interval-component2',
-                    interval=1*1000, # in milliseconds
+                    interval=100, # in milliseconds
+                    n_intervals=0
+                ),
+                dcc.Interval(
+                    id='interval-loading',
+                    interval=100,
                     n_intervals=0
                 )
             ], style={'width': '80%', 'height': '500px', 'float':'left'}),
@@ -398,10 +407,10 @@ class DaVinciCode():
                         style={'height': 400}
                     ),
                     html.Div([
+                        html.Button('Execute', id='execute-button', style=button_style),
                         dcc.Loading(
                             id="loading",
                             children=html.Div([
-                                html.Button('Execute', id='execute-button', style=button_style),
                                 html.Div(id='output')
                             ]),
                             type="circle"
@@ -409,7 +418,6 @@ class DaVinciCode():
                     ], style= {'right': 37, 'position': 'absolute'})
                 ], style={'margin-left': '5%'})
         ], style={'height': '633px', 'overflow': 'hidden'})
-
         @app.callback(
             Output('icicle-wrap', 'children'),
             [Input('metric-slider', 'value'),
@@ -551,6 +559,34 @@ class DaVinciCode():
             else:
                 raise PreventUpdate
 
+        @app.callback(
+            Output('execute-button', 'style'),
+            [Input('interval-loading', 'n_intervals')])
+        def check_execution(n_intervals):
+            button_style = {
+                "background-color": "#008CBA", 
+                "border": "none", 
+                "color": "white", 
+                "padding": "15px 32px", 
+                "text-align": "center", 
+                "display": "inline-block", 
+                "font-size": 16, 
+                "margin": "4px 2px", 
+                "cursor": "pointer",
+                "width": "150px",
+                "border-radius": "5%"
+            }
+            if self.running_recommendation:
+                button_style['visibility'] = "hidden"
+                return button_style
+
+            if not self.running_experiment:
+                return button_style
+
+            button_style["disabled"] = True
+            button_style["opacity"] = 0.5
+            return button_style
+
         # execute button handler
         app.callback(Output('output', 'value'),
             [Input('execute-button', 'n_clicks')],
@@ -642,7 +678,9 @@ class DaVinciCode():
     #     update()
 
     def experiment(self, library, model, params, highlighted=False):
+        self.running_experiment = True
         self.run_experiment(library, model, params, highlighted)
+        self.running_experiment = False
         self.update()
 
     def experiment_batch(self, libraries, models, paramss):
@@ -681,7 +719,7 @@ class DaVinciCode():
         self.X_test = X_test
         self.y_train = y_train
         self.y_test = y_test
-        
+
         recs = [
             [['main', 'MLPClassifier', 'alpha=0.1'], 'max_iter=300', self.ut_p],
             [['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p]
