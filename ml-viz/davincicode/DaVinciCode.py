@@ -608,10 +608,11 @@ class DaVinciCode():
 
             model_hyps = self.ut_pair[self.ut_pair['model'] == model].iloc[0]
             for j in range(self.max_len_candidates):
-                hyp = model_hyps[str(j) + "_order_hyp"].split("=")[0]
-                for k in rec[0] + [rec[1]]:
-                    if hyp in k:
-                        reconstructed_rec.append(k)
+                if model_hyps[str(j) + "_order_hyp"]:
+                    hyp = model_hyps[str(j) + "_order_hyp"].split("=")[0]
+                    for k in rec[0] + [rec[1]]:
+                        if hyp in k:
+                            reconstructed_rec.append(k)
 
             self.recommendations[i] = [reconstructed_rec[:-1], reconstructed_rec[-1], rec[2]]
 
@@ -688,7 +689,7 @@ class DaVinciCode():
         self.running_experiment = False
         self.update()
 
-    def experiment_batch(self, libraries, models, paramss):
+    def experiment_batch(self, libraries, models, params):
         if len(libraries) != len(models) or len(libraries) != len(params) or len(models) != len(params):
             print("error")
         for i in range(len(models)):
