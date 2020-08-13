@@ -675,24 +675,24 @@ class DaVinciCode():
 
         self.app = app
 
-    def organize_recs_hierarchy(self):
-        for i in range(len(self.recommendations)):
-            rec = self.recommendations[i]
-            model = rec[0][1]
+    # def organize_recs_hierarchy(self):
+    #     for i in range(len(self.recommendations)):
+    #         rec = self.recommendations[i]
+    #         model = rec[0][1]
 
-            # if a hierarchy for this model currently exists, reorder the recommendation path accordingly
-            if model in self.ut_pair['model'].values:
-                reconstructed_rec = ['main', model]
+    #         # if a hierarchy for this model currently exists, reorder the recommendation path accordingly
+    #         if model in self.ut_pair['model'].values:
+    #             reconstructed_rec = ['main', model]
 
-                model_hyps = self.ut_pair[self.ut_pair['model'] == model].iloc[0]
-                for j in range(self.max_len_candidates):
-                    if model_hyps[str(j) + "_order_hyp"]:
-                        hyp = model_hyps[str(j) + "_order_hyp"].split("=")[0]
-                        for k in rec[0] + [rec[1]]:
-                            if hyp in k:
-                                reconstructed_rec.append(k)
+    #             model_hyps = self.ut_pair[self.ut_pair['model'] == model].iloc[0]
+    #             for j in range(self.max_len_candidates):
+    #                 if model_hyps[str(j) + "_order_hyp"]:
+    #                     hyp = model_hyps[str(j) + "_order_hyp"].split("=")[0]
+    #                     for k in rec[0] + [rec[1]]:
+    #                         if hyp in k:
+    #                             reconstructed_rec.append(k)
 
-                self.recommendations[i] = [reconstructed_rec[:-1], reconstructed_rec[-1], rec[2]]
+    #             self.recommendations[i] = [reconstructed_rec[:-1], reconstructed_rec[-1], rec[2]]
 
     def update(self):
         self.grab_autologs()
