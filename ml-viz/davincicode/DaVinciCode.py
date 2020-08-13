@@ -335,18 +335,18 @@ class DaVinciCode():
 
         return True
 
-    def add_rec(self, path, value, dictionary):
-        node = {'name': value, 'color': 'grey', 'size': 2}
-        if path == ['main']:
-            dictionary['children'].append(node)
-            return
-        current = self.grab_node(path, dictionary)
-        current.pop('size', None)
-        if 'children' not in current:
-            current['children'] = []
-        # check for duplicates
-        if not any(child['value'] == value for child in current['children']):
-            current['children'].append(node)
+    # def add_rec(self, path, value, dictionary):
+    #     node = {'name': value, 'color': 'grey', 'size': 2}
+    #     if path == ['main']:
+    #         dictionary['children'].append(node)
+    #         return
+    #     current = self.grab_node(path, dictionary)
+    #     current.pop('size', None)
+    #     if 'children' not in current:
+    #         current['children'] = []
+    #     # check for duplicates
+    #     if not any(child['value'] == value for child in current['children']):
+    #         current['children'].append(node)
 
     def highlight_executed_recs(self, dictionary):
         ut_pair[ut_pair['highlighted'] == True].apply(lambda row: self.grab_node(dictionary), axis=1)
@@ -765,17 +765,18 @@ class DaVinciCode():
     #     # normalize_hyp_keys(params)
     #     update()
 
-    def experiment(self, library, model, params, highlighted=False):
+    def experiment(self, library, model, params, highlighted=False, updateViz=True):
         self.running_experiment = True
         self.run_experiment(library, model, params, highlighted)
         self.running_experiment = False
-        self.update()
+        if updateViz:
+            self.update()
 
-    def experiment_batch(self, libraries, models, params):
+    def experiment_batch(self, libraries, models, params, updateViz=True):
         if len(libraries) != len(models) or len(libraries) != len(params) or len(models) != len(params):
             print("error")
         for i in range(len(models)):
-            self.experiment(libraries[i], models[i], params[i])
+            self.experiment(libraries[i], models[i], params[i], highlighted=False, updateViz=updateViz)
 
     def reset(self):
         if os.path.isdir(self.logs_path + "mlruns"):
