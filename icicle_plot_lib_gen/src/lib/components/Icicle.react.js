@@ -41,7 +41,7 @@ export default class Icicle extends Component {
       return false;
     }} tooltipTitle = {(d) => {
       return "accuracy: " + d.color; 
-    }} height={300} width={750} onClick = {(e) => {
+    }} height={300} width={860} onClick = {(e) => {
       console.log(e);
       let pathBuilder = "";
       let current = e.__dataNode;
