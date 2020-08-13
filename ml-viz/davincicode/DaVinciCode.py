@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from jupyter_dash import JupyterDash
 import dash
 import dash_core_components as dcc
-import dash_bootstrap_components as dbc
+# import dash_bootstrap_components as dbc
 import dash_html_components as html
 from dash.exceptions import PreventUpdate
 from dash.dependencies import Input, Output, ALL, MATCH, State
@@ -23,13 +23,16 @@ from IPython.display import display, HTML
 
 import sklearn
 from sklearn.metrics import accuracy_score, log_loss
-import xgboost as xgb
 import mlflow
 import mlflow.xgboost
 import mlflow.sklearn
 
 # libraries
 from sklearn.neural_network import MLPClassifier
+from sklearn.linear_model import LogisticRegression
+import xgboost as xgb
+
+from IPython.display import display, HTML
 
 class DaVinciCode():
 
@@ -45,6 +48,8 @@ class DaVinciCode():
     logs_path = 0
     update_available = False
     display = False
+    running_experiment = False
+    running_recommendation = False
     port = 0
     pc = 0
     id_updater = 0
@@ -56,8 +61,10 @@ class DaVinciCode():
     y_train = 0
 
     def grab_autologs(self):
-
-        dirs = os.listdir(self.logs_path + "mlruns/0")
+        
+        dirs = []
+        if os.path.exists(self.logs_path + "mlruns"):
+            dirs = os.listdir(self.logs_path + "mlruns/0")
         dictionary = []
         for i in dirs:
             row = {}
@@ -88,6 +95,24 @@ class DaVinciCode():
             row['model_params'] = model_params
             row['model'] = model_name
             dictionary.append(row)
+
+        hyperparameters = []
+        if dictionary:
+            self.ut_pair = pd.DataFrame(dictionary)
+            hyperparameters = self.ut_pair.drop(['accuracy', 'highlighted'], axis=1).values.tolist()
+        for rec in self.recommendations:
+            recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
+            ## inefficient
+            
+            rec_params = {}
+            for hyp in rec[0][2:] + [rec[1]]:
+                rec_params[hyp.split("=")[0]] = hyp.split("=")[1]
+
+            # if recommendation is already executed
+            if dictionary and any(rec_params in hyperparamset and rec[0][1] in hyperparamset for hyperparamset in hyperparameters):
+                continue
+
+            dictionary.append({'model': rec[0][1], 'model_params': rec_params, 'highlighted': False, 'accuracy': 'grey'})
             
         self.ut_pair = pd.DataFrame(dictionary)
         self.ut_pair.to_csv('ut_pair.csv')
@@ -136,6 +161,8 @@ class DaVinciCode():
             current_index = i
             self.ut_pair[str(i) + "_order_hyp"] = self.ut_pair[['model', 'rid', 'highlighted']].apply(hp_viz_creator,axis=1)
 
+        self.ut_pair['accuracy'] = pd.to_numeric(self.ut_pair['accuracy'], errors='ignore', downcast='float')
+
 
     def format_icicle_data(self):
         self.hierarchy_path = ['model'] + [str(i) + '_order_hyp' for i in range(self.max_len_candidates)]
@@ -151,7 +178,9 @@ class DaVinciCode():
             grouped = frame.groupby(frame.columns[0])
             d = {k: recur_dictify(g.iloc[:,1:]) for k,g in grouped}
             return d
+
         self.ut_p = recur_dictify(self.ut_p)
+
 
         # now remove the highlighted tags from the pandas dataframe (so it doesn't mess up the parallel coordinates plot)
         self.ut_pair = self.ut_pair.replace(" highlighted", "", regex=True)
@@ -159,7 +188,10 @@ class DaVinciCode():
         self.low_color = 2.0
         self.high_color = -1.0
         def recur_hierarch(frame):
-            if isinstance(frame, np.float64) or isinstance(frame, float) or isinstance(frame, np.ndarray):
+            if isinstance(frame, np.float64) or isinstance(frame, np.float32) or isinstance(frame, float) or isinstance(frame, np.ndarray) or isinstance(frame, str):
+                # print(frame)
+                if isinstance(frame, np.ndarray):
+                    return frame[0], frame[0]
                 return frame, frame
             children = []
             colors = []
@@ -167,26 +199,43 @@ class DaVinciCode():
                 children_c, color = recur_hierarch(frame[key])
                 if isinstance(color, np.ndarray):
                     color = color[0]
-                colors.append(color)
                 
-                if children_c != [] and not isinstance(children_c, float) and not isinstance(children_c[0], np.float64):
+                if color != 'grey':
+                    colors.append(color)
+                
+                if children_c != [] and not isinstance(children_c, float) and not isinstance(children_c, str) and not isinstance(children_c[0], np.float64) and not isinstance(children_c[0], np.float32) :
                     # node
                     children.append({'name': key, 'color': color, 'children': children_c})
                 else:
                     # leaf
-                    if color < self.low_color:
-                        self.low_color = color
-                    if color > self.high_color:
-                        self.high_color = color
-                    child = {'name': key.replace(" highlighted", ""), 'color': color, 'size': 1}
-                    if " highlighted" in key:
-                        child['border'] = "grey"
-                        child['borderWidth'] = "0.45%"
-                    children.append(child)
+
+                    # experiment
+                    if color != "grey":
+                        color = float(color)
+                        if color < self.low_color:
+                            self.low_color = color
+                        if color > self.high_color:
+                            self.high_color = color
+                        child = {'name': key.replace(" highlighted", ""), 'color': round(color, 3), 'size': 1}
+                        if " highlighted" in key:
+                            child['border'] = "orange"
+                            child['borderWidth'] = "0.45%"
+                        children.append(child)
+
+                    # recommendation
+                    else:
+                        child = {'name': key, 'color': color, 'size': 1}
+                        children.append(child)
+
+            # print(frame)
+            # print(children)
+            if len(colors) == 0:
+                return children, 'grey'
             return children, max(colors)
 
         children_ut_p, color = recur_hierarch(self.ut_p)
         self.ut_p = {'name': 'main', 'color': color, 'children': children_ut_p}
+        # print(self.ut_p)
 
     def attach_subtree(self, path, current):
         if path == []:
@@ -211,23 +260,32 @@ class DaVinciCode():
         if path == ['main']:
             return dictionary
         current = dictionary
+
+        # model has to be the second item in path
+        model = path[1]
+
         stack = copy.deepcopy(path)
+        stack = stack[1:]
         stack.reverse()
-        stack.pop()
-        while(len(stack) > 0):
-            searcher = stack.pop()
+        # stack.pop()
+        while len(stack) > 0:
+            # searcher = stack.pop()
             found = False
             if 'children' in current:
                 for i in current['children']:
-                    if i['name'] == searcher:
-                        current = i
-                        found = True
+                    for j in range(len(stack)):
+                        if i['name'] == stack[j]:
+                            current = i
+                            found = True
+                            del stack[j]
+                            break
+                    if found:
                         break
             if not found:
                 # print(stack + [searcher])
                 # print(current)
                 # print()
-                self.attach_subtree(stack + [searcher], current)
+                self.attach_subtree(stack, current)
                 return self.grab_node(path, dictionary)
         return current
 
@@ -241,7 +299,7 @@ class DaVinciCode():
 
     def remove_nodes_out_of_range(self, low_r, high_r, dictionary):
         if 'children' not in dictionary:
-            if isinstance(dictionary['color'], str):
+            if dictionary['color'] == 'grey':
                 return False
             if float(dictionary['color']) < low_r or float(dictionary['color']) > high_r:
                 return True
@@ -261,7 +319,7 @@ class DaVinciCode():
             return True
         
         # update color
-        children_colors = [child['color'] for child in dictionary['children'] if not isinstance(child['color'], str)]
+        children_colors = [child['color'] for child in dictionary['children'] if child['color'] != 'grey']
         if len(children_colors) > 0:
             dictionary['color'] = max(children_colors)
         else:
@@ -286,17 +344,17 @@ class DaVinciCode():
         current.pop('size', None)
         if 'children' not in current:
             current['children'] = []
-        current['children'].append(node)
-
-    def highlight_rec(self, row):
-        node = grab_node()
-        return row
+        # check for duplicates
+        if not any(child['value'] == value for child in current['children']):
+            current['children'].append(node)
 
     def highlight_executed_recs(self, dictionary):
         ut_pair[ut_pair['highlighted'] == True].apply(lambda row: self.grab_node(dictionary), axis=1)
 
     def execute_code(self, n_clicks, code):
+        self.running_recommendation = True
         exec(code.replace("app.", "self."))
+        self.running_recommendation = False
 
     def init_app(self):
 
@@ -339,12 +397,12 @@ class DaVinciCode():
 
         pc = go.Figure(data=[go.Scatter(x=[], y=[])])
         if self.ut_pair is not 0 and not self.ut_pair.empty:
-            pc = px.parallel_coordinates(ut_pair_numeric.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
+            pc = px.parallel_coordinates(ut_pair_numeric.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
         pc_o = pc
 
         marks = {}
-        for i in range(0, 100, 5):
+        for i in range(0, 100, 10):
             marks[i/100] = str(i/100)
 
         button_style = {
@@ -357,57 +415,85 @@ class DaVinciCode():
             "font-size": 16, 
             "margin": "4px 2px", 
             "cursor": "pointer",
-            "width": "18%"
+            "width": "150px",
+            "border-radius": "5%"
             }
 
         app.layout = html.Div([
             html.Div([
-                dcc.RangeSlider(
-                    id='metric-slider',
-                    min=0,
-                    max=1,
-                    step=0.05,
-                    value=[0, 1],
-                    marks=marks
-                ),
                 html.Div(
                     icicle_plot_fig,
                     id='icicle-wrap'
                 ),
                 dcc.Graph(
                     id='pc',
-                    figure=pc
+                    figure=pc,
+                    style={'height': 350}
                 ),
                 dcc.Interval(
                     id='interval-component',
-                    interval=1*1000, # in milliseconds
+                    interval=1000, # in milliseconds
                     n_intervals=0
                 ),
                 dcc.Interval(
                     id='interval-component2',
-                    interval=1*1000, # in milliseconds
+                    interval=1000, # in milliseconds
                     n_intervals=0
-                )
-            ], style={'width': '78%', 'height': '500px', 'float':'left'}),
-            html.Div([
-                    html.H3('Sand Box', id='sandboxtext'),
-                    dcc.Textarea(
-                        id='sandbox',
-                        value='',
-                        style={'height': 400}
-                    ),
+                ),
+                dcc.Interval(
+                    id='interval-loading',
+                    interval=100,
+                    n_intervals=0
+                ),
+                html.H3('Sand Box', id='sandboxtext'),
+                dcc.Textarea(
+                    id='sandbox',
+                    value='',
+                    style={'height': 120, 'width': '90%'}
+                ),
+                html.Div([
+                    html.Button('Execute', id='execute-button', style=button_style),
                     dcc.Loading(
                         id="loading",
                         children=html.Div([
-                            html.Button('Execute', id='execute-button', style=button_style),
                             html.Div(id='output')
                         ]),
-                        type="cube",
-                        fullscreen=True
+                        type="circle",
+                        style={'margin-bottom': '6%'}
                     )
-                ], style={'margin-left': '5%'})
-        ])
-
+                ])
+            ], style={'width': '87%', 'height': '100%', 'float':'left'}),
+            html.Div([
+                dcc.RangeSlider(
+                    id='metric-slider',
+                    min=0,
+                    max=1,
+                    step=0.01,
+                    value=[0, 1],
+                    marks=marks,
+                    vertical=True,
+                    verticalHeight=500
+                )
+            ], style={'margin-left': '90%', 'margin-top':'2%'})
+            # html.Div([
+            #         html.H3('Sand Box', id='sandboxtext', style={"text-align": 'center'}),
+            #         dcc.Textarea(
+            #             id='sandbox',
+            #             value='',
+            #             style={'height': 400}
+            #         ),
+            #         html.Div([
+            #             html.Button('Execute', id='execute-button', style=button_style),
+            #             dcc.Loading(
+            #                 id="loading",
+            #                 children=html.Div([
+            #                     html.Div(id='output')
+            #                 ]),
+            #                 type="circle"
+            #             )
+            #         ], style= {'right': 37, 'position': 'absolute'})
+            #     ], style={'margin-left': '5%'})
+        ], style={'height': '100%', 'overflow': 'hidden'})
         @app.callback(
             Output('icicle-wrap', 'children'),
             [Input('metric-slider', 'value'),
@@ -463,7 +549,7 @@ class DaVinciCode():
 
             if len(clickData) == 0:
                 if self.update_available:
-                    pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
+                    pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
                     return pc
                 raise PreventUpdate
@@ -479,7 +565,7 @@ class DaVinciCode():
                 raise PreventUpdate
 
             if clickData.split("/")[:-2] == []:
-                pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
+                pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
                 return pc
             if clickData:
@@ -506,11 +592,11 @@ class DaVinciCode():
                         labels_pc[i] = sample_vals[i].split("=")[0]
                 
                 selected_df = selected_df.apply(make_ints, axis=1)
-                self.pc = px.parallel_coordinates(selected_df, color="accuracy", dimensions=self.hierarchy_path[subset_counter:],
+                self.pc = px.parallel_coordinates(selected_df, color="accuracy", dimensions=self.hierarchy_path[subset_counter:] + ['accuracy'],
                                         labels=labels_pc, color_continuous_scale='RdBu', height=350)
                 # print(ut_pair_copy.apply(make_ints, axis=1))
                 return self.pc
-            self.pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path,
+            self.pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
             return self.pc
         
@@ -539,15 +625,48 @@ class DaVinciCode():
                     
                     try:
                         params_rec[i.split("=")[0]] = float(i.split("=")[1]) # for int, long, float and complex
+                        if params_rec[i.split("=")[0]].is_integer():
+                            params_rec[i.split("=")[0]] = int(params_rec[i.split("=")[0]])
                     except ValueError:
                         params_rec[i.split("=")[0]] = i.split("=")[1]
 
-                    if params_rec[i.split("=")[0]].is_integer():
-                        params_rec[i.split("=")[0]] = int(params_rec[i.split("=")[0]])
-                code = "app.experiment(library = 'sklearn', model = " + model_name + ", params = " + str(params_rec) + ", highlighted = True)"
+                code = "app.experiment(\nlibrary = 'sklearn',\nmodel = " + model_name + ",\nparams = \n" + str(params_rec).replace('{', '{\n  ').replace(',', ',\n ').replace('}', '\n}') + ",\nhighlighted = True)"
                 return code
             else:
                 raise PreventUpdate
+
+        @app.callback(
+            Output('execute-button', 'style'),
+            [Input('interval-loading', 'n_intervals')])
+        def check_execution(n_intervals):
+
+            button_style = {
+                "background-color": "#008CBA", 
+                "border": "none", 
+                "color": "white", 
+                "padding": "15px 32px", 
+                "text-align": "center", 
+                "display": "inline-block", 
+                "font-size": 16, 
+                "margin": "4px 2px", 
+                "cursor": "pointer",
+                "width": "150px",
+                "border-radius": "5%"
+            }
+
+            if not self.running_experiment and not self.running_recommendation:
+                return button_style
+
+            if self.running_recommendation:
+                button_style['visibility'] = "hidden"
+                button_style["cursor"] = 'not-allowed'
+                button_style['pointer-events'] = "none"
+                return button_style
+
+            button_style["cursor"] = 'not-allowed'
+            button_style['pointer-events'] = "none"
+            button_style["opacity"] = 0.5
+            return button_style
 
         # execute button handler
         app.callback(Output('output', 'value'),
@@ -556,25 +675,51 @@ class DaVinciCode():
 
         self.app = app
 
+    def organize_recs_hierarchy(self):
+        for i in range(len(self.recommendations)):
+            rec = self.recommendations[i]
+            model = rec[0][1]
+
+            # if a hierarchy for this model currently exists, reorder the recommendation path accordingly
+            if model in self.ut_pair['model'].values:
+                reconstructed_rec = ['main', model]
+
+                model_hyps = self.ut_pair[self.ut_pair['model'] == model].iloc[0]
+                for j in range(self.max_len_candidates):
+                    if model_hyps[str(j) + "_order_hyp"]:
+                        hyp = model_hyps[str(j) + "_order_hyp"].split("=")[0]
+                        for k in rec[0] + [rec[1]]:
+                            if hyp in k:
+                                reconstructed_rec.append(k)
+
+                self.recommendations[i] = [reconstructed_rec[:-1], reconstructed_rec[-1], rec[2]]
+
     def update(self):
         self.grab_autologs()
         self.create_hierarchy()
+
         self.format_icicle_data()
 
+        # remove recommendations from parallel coordinates dataframe
+        self.ut_pair.drop(self.ut_pair.index[self.ut_pair['accuracy'] == 'grey'], inplace = True)
+        self.ut_pair['accuracy'] = self.ut_pair['accuracy'].astype(float)
+
+        # self.organize_recs_hierarchy()
+
         ## Remove Executed Recommendations
-        hyperparameters = self.ut_pair.drop(['rid', 'accuracy', 'model_params', 'highlighted'], axis=1).values.tolist()
-        for rec in self.recommendations:
-            recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
-            ## inefficient
-            if any(all(item in recommendation_path for item in ut_list if item is not None) for ut_list in hyperparameters):
-                continue
-            rec[2] = self.ut_p
-            self.add_rec(*tuple(rec))
+        # hyperparameters = self.ut_pair.drop(['rid', 'accuracy', 'model_params', 'highlighted'], axis=1).values.tolist()
+        # for rec in self.recommendations:
+        #     recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
+        #     ## inefficient
+        #     if any(all(item in recommendation_path for item in ut_list if item is not None) for ut_list in hyperparameters):
+        #         continue
+        #     rec[2] = self.ut_p
+        #     self.add_rec(*tuple(rec))
         self.update_available = True
         if self.display == False:
             self.init_app()
             self.display = True
-            self.app.run_server(mode='inline', port=self.port, width=1000)
+            self.app.run_server(mode='inline', port=self.port, width=1000, height=940)
         # print("updated")
 
     def run_experiment(self, library, Model, params, highlighted=False):
@@ -621,24 +766,36 @@ class DaVinciCode():
     #     update()
 
     def experiment(self, library, model, params, highlighted=False):
+        self.running_experiment = True
         self.run_experiment(library, model, params, highlighted)
+        self.running_experiment = False
         self.update()
+
+    def experiment_batch(self, libraries, models, params):
+        if len(libraries) != len(models) or len(libraries) != len(params) or len(models) != len(params):
+            print("error")
+        for i in range(len(models)):
+            self.experiment(libraries[i], models[i], params[i])
 
     def reset(self):
         if os.path.isdir(self.logs_path + "mlruns"):
             shutil.rmtree(self.logs_path + "mlruns")
-        # self.recommendations = []
-        self.ut_pair = pd.DataFrame()
-        self.ut_p = {"name": "main", "color": "grey", "children": []}
-        for rec in self.recommendations:
-            rec[2] = self.ut_p
-            self.add_rec(*tuple(rec))
-        self.update_available = True
-        if self.display == False:
-            self.init_app()
-            self.display = True
-            self.app.run_server(mode='inline', port=self.port, width=1000)
+        # # self.recommendations = []
+        # self.ut_pair = pd.DataFrame()
+        # self.ut_p = {"name": "main", "color": "grey", "children": []}
+        # for rec in self.recommendations:
+        #     rec[2] = self.ut_p
+        #     self.add_rec(*tuple(rec))
+        # self.update_available = True
+        # if self.display == False:
+        #     self.init_app()
+        #     self.display = True
+        #     self.app.run_server(mode='inline', port=self.port, width=1000, height=940)
 
+        self.update()
+
+    def clear(self):
+        self.reset()
     def __init__(self, port, X_test=None, X_train=None, y_train=None, y_test=None):
 
         self.port = port
@@ -655,15 +812,24 @@ class DaVinciCode():
         self.y_train = y_train
         self.y_test = y_test
 
-        self.recommendations.append([['main', 'MLPClassifier', 'max_iter=300'], 'alpha=0.1', self.ut_p])
-        self.recommendations.append([['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p])
+        # display(HTML("<script>$('div.cell.selected').children('div.output_wrapper').height(940);</script>"))
+
+        recs = [
+            [['main', 'MLPClassifier', 'alpha=0.1'], 'max_iter=300', self.ut_p],
+            [['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p],
+            [['main', 'LogisticRegression', 'penalty=l2'], 'C=0.5', self.ut_p]
+        ]
+
+        for rec in recs:
+            if not any(rec[0] == i[0] and rec[1] == i[1] for i in self.recommendations):
+                self.recommendations.append(rec)
 
         if not os.path.isdir(self.logs_path + "mlruns"):
             if self.recommendations:
                 self.reset()
             return
 
-        if len(os.listdir(self.logs_path + "mlruns/0")) == 2 and 'meta.yaml' in os.listdir(self.logs_path + "mlruns/0"):
+        if all(['.' in fileD for fileD in os.listdir(self.logs_path + "mlruns/0")]):
             if self.recommendations:
                 self.reset()
             # empty autologs dir
