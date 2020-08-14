@@ -37,8 +37,8 @@ from IPython.display import display, HTML
 class DaVinciCode():
 
     app = 0
-    ut_pair = 0
-    ut_p = 0
+    pc_data = 0
+    icicle_data = 0
     low_color = 2
     high_color = -1
     max_len_candidates = 0
@@ -98,8 +98,8 @@ class DaVinciCode():
 
         hyperparameters = []
         if dictionary:
-            self.ut_pair = pd.DataFrame(dictionary)
-            hyperparameters = self.ut_pair.drop(['accuracy', 'highlighted'], axis=1).values.tolist()
+            self.pc_data = pd.DataFrame(dictionary)
+            hyperparameters = self.pc_data.drop(['accuracy', 'highlighted'], axis=1).values.tolist()
         for rec in self.recommendations:
             recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
             ## inefficient
@@ -114,11 +114,11 @@ class DaVinciCode():
 
             dictionary.append({'model': rec[0][1], 'model_params': rec_params, 'highlighted': False, 'accuracy': 'grey'})
             
-        self.ut_pair = pd.DataFrame(dictionary)
-        self.ut_pair.to_csv('ut_pair.csv')
-        self.ut_pair = pd.read_csv('ut_pair.csv')
-        self.ut_pair.model_params = self.ut_pair.model_params.apply(ast.literal_eval)
-        self.ut_pair = self.ut_pair.rename(columns={'Unnamed: 0': 'rid'})
+        self.pc_data = pd.DataFrame(dictionary)
+        self.pc_data.to_csv('pc_data.csv')
+        self.pc_data = pd.read_csv('pc_data.csv')
+        self.pc_data.model_params = self.pc_data.model_params.apply(ast.literal_eval)
+        self.pc_data = self.pc_data.rename(columns={'Unnamed: 0': 'rid'})
 
     def create_hierarchy(self):
 
@@ -130,11 +130,11 @@ class DaVinciCode():
         # key is model, value is hyperparameters
         hp_key = {}
         
-        for model_iter in self.ut_pair.model.unique():
+        for model_iter in self.pc_data.model.unique():
             # get relevant recommendations to determine uniqueness of hyperparameter values
             relevant_recs = ['/'.join(rec[0] + [rec[1]]) for rec in self.recommendations if model_iter in rec[0]]
-            hyperparams_df = pd.DataFrame(self.ut_pair[self.ut_pair.model == model_iter].model_params.to_list())
-            hp_candidates = sorted(list(self.ut_pair[self.ut_pair.model == model_iter].model_params.to_list()[0].keys()), key=sorting_criteria)
+            hyperparams_df = pd.DataFrame(self.pc_data[self.pc_data.model == model_iter].model_params.to_list())
+            hp_candidates = sorted(list(self.pc_data[self.pc_data.model == model_iter].model_params.to_list()[0].keys()), key=sorting_criteria)
 
             # filter out hyperparameters that have only 1 unique value across all experiments (for this model), and don't have any recommendations with
             # the same hyperparameters either
@@ -143,8 +143,8 @@ class DaVinciCode():
             if len(hp_candidates) > self.max_len_candidates:
                 self.max_len_candidates = len(hp_candidates)
                 
-        hyperparams_df = pd.DataFrame(self.ut_pair.model_params.to_list())
-        hyperparams_df['rid'] = self.ut_pair['rid'].values
+        hyperparams_df = pd.DataFrame(self.pc_data.model_params.to_list())
+        hyperparams_df['rid'] = self.pc_data['rid'].values
 
         current_index = 0
         def hp_viz_creator(row):
@@ -159,14 +159,14 @@ class DaVinciCode():
 
         for i in range(self.max_len_candidates):
             current_index = i
-            self.ut_pair[str(i) + "_order_hyp"] = self.ut_pair[['model', 'rid', 'highlighted']].apply(hp_viz_creator,axis=1)
+            self.pc_data[str(i) + "_order_hyp"] = self.pc_data[['model', 'rid', 'highlighted']].apply(hp_viz_creator,axis=1)
 
-        self.ut_pair['accuracy'] = pd.to_numeric(self.ut_pair['accuracy'], errors='ignore', downcast='float')
+        self.pc_data['accuracy'] = pd.to_numeric(self.pc_data['accuracy'], errors='ignore', downcast='float')
 
 
     def format_icicle_data(self):
         self.hierarchy_path = ['model'] + [str(i) + '_order_hyp' for i in range(self.max_len_candidates)]
-        self.ut_p = self.ut_pair[self.hierarchy_path + ['accuracy']]
+        self.icicle_data = self.pc_data[self.hierarchy_path + ['accuracy']]
         def recur_dictify(frame):
             if len(frame.columns) == 1:
                 if frame.values.size == 1: return frame.values[0][0]
@@ -179,12 +179,12 @@ class DaVinciCode():
             d = {k: recur_dictify(g.iloc[:,1:]) for k,g in grouped}
             return d
 
-        self.ut_p = recur_dictify(self.ut_p)
+        self.icicle_data = recur_dictify(self.icicle_data)
 
 
         # now remove the highlighted tags from the pandas dataframe (so it doesn't mess up the parallel coordinates plot)
-        self.ut_pair = self.ut_pair.replace(" highlighted", "", regex=True)
-        # print(self.ut_pair)
+        self.pc_data = self.pc_data.replace(" highlighted", "", regex=True)
+        # print(self.pc_data)
         self.low_color = 2.0
         self.high_color = -1.0
         def recur_hierarch(frame):
@@ -233,9 +233,9 @@ class DaVinciCode():
                 return children, 'grey'
             return children, max(colors)
 
-        children_ut_p, color = recur_hierarch(self.ut_p)
-        self.ut_p = {'name': 'main', 'color': color, 'children': children_ut_p}
-        # print(self.ut_p)
+        children_icicle_data, color = recur_hierarch(self.icicle_data)
+        self.icicle_data = {'name': 'main', 'color': color, 'children': children_icicle_data}
+        # print(self.icicle_data)
 
     def attach_subtree(self, path, current):
         if path == []:
@@ -349,7 +349,7 @@ class DaVinciCode():
     #         current['children'].append(node)
 
     def highlight_executed_recs(self, dictionary):
-        ut_pair[ut_pair['highlighted'] == True].apply(lambda row: self.grab_node(dictionary), axis=1)
+        pc_data[pc_data['highlighted'] == True].apply(lambda row: self.grab_node(dictionary), axis=1)
 
     def execute_code(self, n_clicks, code):
         self.running_recommendation = True
@@ -363,8 +363,8 @@ class DaVinciCode():
         app.css.config.serve_locally = True
         app.scripts.config.serve_locally = True
 
-        # self.add_rec(['main', 'MLPClassifier'], 'alpha=0.1', self.ut_p)
-        # self.add_rec(['main', 'MLPClassifier'], 'alpha=0.01', self.ut_p)
+        # self.add_rec(['main', 'MLPClassifier'], 'alpha=0.1', self.icicle_data)
+        # self.add_rec(['main', 'MLPClassifier'], 'alpha=0.01', self.icicle_data)
 
         def df_to_dict(ut):
             data = {}
@@ -373,7 +373,7 @@ class DaVinciCode():
                     data_key = g[col_name].iloc[0]
                     data[data_key] = {}
 
-        data = copy.deepcopy(self.ut_p)
+        data = copy.deepcopy(self.icicle_data)
 
         icicle_plot_fig = icicle_plot.Icicle(
             id='icicle_plot_fig',
@@ -393,11 +393,11 @@ class DaVinciCode():
                         row[col]
             return row
 
-        ut_pair_numeric = self.ut_pair.apply(make_ints, axis=1)
+        pc_data_numeric = self.pc_data.apply(make_ints, axis=1)
 
         pc = go.Figure(data=[go.Scatter(x=[], y=[])])
-        if self.ut_pair is not 0 and not self.ut_pair.empty:
-            pc = px.parallel_coordinates(ut_pair_numeric.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
+        if self.pc_data is not 0 and not self.pc_data.empty:
+            pc = px.parallel_coordinates(pc_data_numeric.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
         pc_o = pc
 
@@ -504,12 +504,12 @@ class DaVinciCode():
                 raise PreventUpdate
             
             # revert to original state
-            data = copy.deepcopy(self.ut_p)
+            data = copy.deepcopy(self.icicle_data)
             # print(data)
-            if not self.ut_pair.empty:
+            if not self.pc_data.empty:
                 # delete entries
                 self.remove_nodes_out_of_range(rangeData[0], rangeData[1], data)
-                filtered_accs = self.ut_pair.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))['accuracy']
+                filtered_accs = self.pc_data.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))['accuracy']
                 self.low_color = filtered_accs.min()
                 self.high_color = filtered_accs.max()
                 if rangeData != self.rangeDataOld:
@@ -539,24 +539,24 @@ class DaVinciCode():
                 Input('interval-component2', 'n_intervals')
             ])
         def update_pc(clickData, rangeData, n):
-            if self.ut_pair.empty:
+            if self.pc_data.empty:
                 return go.Figure(data=[go.Scatter(x=[], y=[])])
             trigger_context = dash.callback_context.triggered[0]['prop_id']
             if len(dash.callback_context.triggered) <= 1 and self.update_available == False and (trigger_context == 'interval-component2.n_intervals'):
                 raise PreventUpdate
             
-            ut_pair_copy = self.ut_pair
+            pc_data_copy = self.pc_data
 
             if len(clickData) == 0:
                 if self.update_available:
-                    pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
+                    pc = px.parallel_coordinates(pc_data_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
                     return pc
                 raise PreventUpdate
                 # return self.pc
                 # revert to original state
             # delete entries
-            ut_pair_copy = ut_pair_copy.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))
+            pc_data_copy = pc_data_copy.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))
                 
             if isinstance(clickData, list):
                 clickData = clickData[0]
@@ -565,7 +565,7 @@ class DaVinciCode():
                 raise PreventUpdate
 
             if clickData.split("/")[:-2] == []:
-                pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
+                pc = px.parallel_coordinates(pc_data_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
                 return pc
             if clickData:
@@ -574,7 +574,7 @@ class DaVinciCode():
                 if click_path == []:
                     return pc_o
                 
-                selected_df = ut_pair_copy
+                selected_df = pc_data_copy
                 j = -1
                 for i in click_path:
                     j+=1
@@ -594,9 +594,9 @@ class DaVinciCode():
                 selected_df = selected_df.apply(make_ints, axis=1)
                 self.pc = px.parallel_coordinates(selected_df, color="accuracy", dimensions=self.hierarchy_path[subset_counter:] + ['accuracy'],
                                         labels=labels_pc, color_continuous_scale='RdBu', height=350)
-                # print(ut_pair_copy.apply(make_ints, axis=1))
+                # print(pc_data_copy.apply(make_ints, axis=1))
                 return self.pc
-            self.pc = px.parallel_coordinates(ut_pair_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
+            self.pc = px.parallel_coordinates(pc_data_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
             return self.pc
         
@@ -681,10 +681,10 @@ class DaVinciCode():
     #         model = rec[0][1]
 
     #         # if a hierarchy for this model currently exists, reorder the recommendation path accordingly
-    #         if model in self.ut_pair['model'].values:
+    #         if model in self.pc_data['model'].values:
     #             reconstructed_rec = ['main', model]
 
-    #             model_hyps = self.ut_pair[self.ut_pair['model'] == model].iloc[0]
+    #             model_hyps = self.pc_data[self.pc_data['model'] == model].iloc[0]
     #             for j in range(self.max_len_candidates):
     #                 if model_hyps[str(j) + "_order_hyp"]:
     #                     hyp = model_hyps[str(j) + "_order_hyp"].split("=")[0]
@@ -701,19 +701,19 @@ class DaVinciCode():
         self.format_icicle_data()
 
         # remove recommendations from parallel coordinates dataframe
-        self.ut_pair.drop(self.ut_pair.index[self.ut_pair['accuracy'] == 'grey'], inplace = True)
-        self.ut_pair['accuracy'] = self.ut_pair['accuracy'].astype(float)
+        self.pc_data.drop(self.pc_data.index[self.pc_data['accuracy'] == 'grey'], inplace = True)
+        self.pc_data['accuracy'] = self.pc_data['accuracy'].astype(float)
 
         # self.organize_recs_hierarchy()
 
         ## Remove Executed Recommendations
-        # hyperparameters = self.ut_pair.drop(['rid', 'accuracy', 'model_params', 'highlighted'], axis=1).values.tolist()
+        # hyperparameters = self.pc_data.drop(['rid', 'accuracy', 'model_params', 'highlighted'], axis=1).values.tolist()
         # for rec in self.recommendations:
         #     recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
         #     ## inefficient
         #     if any(all(item in recommendation_path for item in ut_list if item is not None) for ut_list in hyperparameters):
         #         continue
-        #     rec[2] = self.ut_p
+        #     rec[2] = self.icicle_data
         #     self.add_rec(*tuple(rec))
         self.update_available = True
         if self.display == False:
@@ -755,13 +755,13 @@ class DaVinciCode():
         return params
 
     def normalize_hyp_keys(params):
-        self.ut_pair.model_params = self.ut_pair.apply(lambda row: self.normalize_row_keys(row.model_params, params), axis=1)
+        self.pc_data.model_params = self.pc_data.apply(lambda row: self.normalize_row_keys(row.model_params, params), axis=1)
 
     # def add_experiment(model, params, metric):
     #     global current_port
-    #     global ut_pair
-    #     # experiment = {'rid': ut_pair.rid.max() + 1, 'model': model, 'model_params': params, 'accuracy': metric}
-    #     # ut_pair = ut_pair.append(experiment,ignore_index=True)
+    #     global pc_data
+    #     # experiment = {'rid': pc_data.rid.max() + 1, 'model': model, 'model_params': params, 'accuracy': metric}
+    #     # pc_data = pc_data.append(experiment,ignore_index=True)
     #     # normalize_hyp_keys(params)
     #     update()
 
@@ -782,10 +782,10 @@ class DaVinciCode():
         if os.path.isdir(self.logs_path + "mlruns"):
             shutil.rmtree(self.logs_path + "mlruns")
         # # self.recommendations = []
-        # self.ut_pair = pd.DataFrame()
-        # self.ut_p = {"name": "main", "color": "grey", "children": []}
+        # self.pc_data = pd.DataFrame()
+        # self.icicle_data = {"name": "main", "color": "grey", "children": []}
         # for rec in self.recommendations:
-        #     rec[2] = self.ut_p
+        #     rec[2] = self.icicle_data
         #     self.add_rec(*tuple(rec))
         # self.update_available = True
         # if self.display == False:
@@ -816,9 +816,9 @@ class DaVinciCode():
         # display(HTML("<script>$('div.cell.selected').children('div.output_wrapper').height(940);</script>"))
 
         recs = [
-            [['main', 'MLPClassifier', 'alpha=0.1'], 'max_iter=300', self.ut_p],
-            [['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.ut_p],
-            [['main', 'LogisticRegression', 'penalty=l2'], 'C=0.5', self.ut_p]
+            [['main', 'MLPClassifier', 'alpha=0.1'], 'max_iter=300', self.icicle_data],
+            [['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.icicle_data],
+            [['main', 'LogisticRegression', 'penalty=l2'], 'C=0.5', self.icicle_data]
         ]
 
         for rec in recs:
@@ -835,7 +835,7 @@ class DaVinciCode():
                 self.reset()
             # empty autologs dir
             return
-        # if ut_pair[0].count() > 0:
+        # if pc_data[0].count() > 0:
         self.update()
 # grab_autologs('/Users/dhruvm/Documents/GitHub/ml-viz/ml-viz/')
 # create_hierarchy()
