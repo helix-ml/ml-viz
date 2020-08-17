@@ -32,26 +32,55 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.linear_model import LogisticRegression
 import xgboost as xgb
 
+# used for editing the Jupyter display
 from IPython.display import display, HTML
 
 class DaVinciCode():
 
+    # JupyterDash app
     app = 0
+
+    # data for parallel coordinates
     pc_data = 0
+
+    # data for icicle plot
     icicle_data = 0
+
+    # lower end of accuracy range selected by user in range slider
     low_color = 2
+
+    # higher end of accuracy range
     high_color = -1
+
+    # maximum number of hyperparameters for any model
     max_len_candidates = 0
+
+    # used for selecting the n_order_hyp columns from pc_data
     hierarchy_path = 0
+
+    # used for updating the parallel coordinates plot when range slider changed
     rangeDataOld = []
-    clickDataOld = []
+
+    # path of the mlruns/0 directory
     logs_path = 0
+
+    # used to update the viz
     update_available = False
+
+    # True if the viz is currently displayed
     display = False
+
+    # True if currently running an experiment or recommendation
     running_experiment = False
     running_recommendation = False
+
+    # localhost port to run the app on
     port = 0
+
+    # stores the parallel coordinates plot
     pc = 0
+
+    # Used to replace the old icicle plot viz
     id_updater = 0
     recommendations = []
 
