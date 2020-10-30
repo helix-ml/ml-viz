@@ -8,6 +8,7 @@ import shutil
 
 import pandas as pd
 import numpy as np
+import sqlite3
 
 import icicle_plot
 import plotly.express as px
@@ -90,40 +91,81 @@ class DaVinciCode():
     y_train = 0
 
     def grab_autologs(self):
-        
-        dirs = []
-        if os.path.exists(self.logs_path + "mlruns"):
-            dirs = os.listdir(self.logs_path + "mlruns/0")
-        dictionary = []
-        for i in dirs:
-            row = {}
-            if "meta" in i or "DS_Store" in i:
-                continue
-            
-            if not os.path.isfile(self.logs_path + 'mlruns/0/' + i + '/metrics/accuracy'):
-                continue
-            accuracy = float(open(self.logs_path + 'mlruns/0/' + i + '/metrics/accuracy').read().split(" ")[1])
-            row['accuracy'] = accuracy
-            params_files = os.listdir(self.logs_path + 'mlruns/0/' + i + '/params')
-            model_params = {}
-            model_name = 0
-            for j in params_files:
-                if 'model_name' in j:
-                    model_name = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
-                    continue
-                # if 'kernel' in j:
-                #     continue
-                model_params[j] = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
 
-            highlighted_file = open(self.logs_path + 'mlruns/0/' + i + '/tags/highlighted').read()
-            if "True" in highlighted_file:
+        con = self.db_connect(self.db_path)
+        cur = con.cursor()
+        output = self.db_query(cur)
+        # formatted_result = [f"{id:<5}{model:<20}{params:<30}{param_vals:<25}{metrics:<30}{metric_vals:<25}{highlighted:<5}" for id, model, params, param_vals, metrics, metric_vals, highlighted in output]
+        # id, model, params, param_vals, metrics, metric_vals, highlighted = "id", "model", "params", "param_vals", "metrics", "metric_vals", "highlighted"
+        # print('\n'.join([f"{id:<5}{model:<20}{params:<30}{param_vals:<25}{metrics:<30}{metric_vals:<25}{highlighted:<5}"] + formatted_result))
+
+        dictionary = []
+        for id, model, params, param_vals, metrics, metric_vals, highlighted in output:
+            row = {}
+
+            model_params = {}
+            model_metrics = {}
+
+            model_name = model
+            param_names = params.split(", ")
+            param_values = param_vals.split(", ")
+            metric_names = metrics.split(", ")
+            metric_values = metric_vals.split(", ")
+
+            for i, name in enumerate(param_names):
+                model_params[name] = param_values[i]
+
+            for i, name in enumerate(metric_names):
+                model_metrics[name] = metric_values[i]
+                if name == "accuracy":
+                    row['accuracy'] = metric_values[i]
+
+            if "accuracy" not in row:
+                row['accuracy'] = 0
+
+            if highlighted == 1:
                 row['highlighted'] = True
-            elif "False" in highlighted_file:
+            else:
                 row['highlighted'] = False
-            
+
             row['model_params'] = model_params
             row['model'] = model_name
+            print(row)
             dictionary.append(row)
+
+        # dirs = []
+        # if os.path.exists(self.logs_path + "mlruns"):
+        #     dirs = os.listdir(self.logs_path + "mlruns/0")
+        # dictionary = []
+        # for i in dirs:
+        #     row = {}
+        #     if "meta" in i or "DS_Store" in i:
+        #         continue
+        #
+            # if not os.path.isfile(self.logs_path + 'mlruns/0/' + i + '/metrics/accuracy'):
+            #     continue
+            # accuracy = float(open(self.logs_path + 'mlruns/0/' + i + '/metrics/accuracy').read().split(" ")[1])
+            # row['accuracy'] = accuracy
+            # params_files = os.listdir(self.logs_path + 'mlruns/0/' + i + '/params')
+            # model_params = {}
+            # model_name = 0
+            # for j in params_files:
+            #     if 'model_name' in j:
+            #         model_name = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
+            #         continue
+            #     # if 'kernel' in j:
+            #     #     continue
+            #     model_params[j] = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
+            #
+            # highlighted_file = open(self.logs_path + 'mlruns/0/' + i + '/tags/highlighted').read()
+            # if "True" in highlighted_file:
+            #     row['highlighted'] = True
+            # elif "False" in highlighted_file:
+            #     row['highlighted'] = False
+            #
+            # row['model_params'] = model_params
+            # row['model'] = model_name
+            # dictionary.append(row)
 
         hyperparameters = []
         if dictionary:
@@ -132,7 +174,7 @@ class DaVinciCode():
         for rec in self.recommendations:
             recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
             ## inefficient
-            
+
             rec_params = {}
             for hyp in rec[0][2:] + [rec[1]]:
                 rec_params[hyp.split("=")[0]] = hyp.split("=")[1]
@@ -142,7 +184,7 @@ class DaVinciCode():
                 continue
 
             dictionary.append({'model': rec[0][1], 'model_params': rec_params, 'highlighted': False, 'accuracy': 'grey'})
-            
+
         self.pc_data = pd.DataFrame(dictionary)
         self.pc_data.to_csv('pc_data.csv')
         self.pc_data = pd.read_csv('pc_data.csv')
@@ -158,7 +200,7 @@ class DaVinciCode():
 
         # key is model, value is hyperparameters
         hp_key = {}
-        
+
         for model_iter in self.pc_data.model.unique():
             # get relevant recommendations to determine uniqueness of hyperparameter values
             relevant_recs = ['/'.join(rec[0] + [rec[1]]) for rec in self.recommendations if model_iter in rec[0]]
@@ -171,7 +213,7 @@ class DaVinciCode():
             hp_key[model_iter] = hp_candidates
             if len(hp_candidates) > self.max_len_candidates:
                 self.max_len_candidates = len(hp_candidates)
-                
+
         hyperparams_df = pd.DataFrame(self.pc_data.model_params.to_list())
         hyperparams_df['rid'] = self.pc_data['rid'].values
 
@@ -200,7 +242,7 @@ class DaVinciCode():
             if len(frame.columns) == 1:
                 if frame.values.size == 1: return frame.values[0][0]
                 return frame.values.squeeze()
-            
+
             # for rows that contain None values (have fewer hyperparameters than others)
             if frame[frame.columns[0]].iloc[0] == None:
                 return frame.values[0][len(frame.values[0])-1]
@@ -228,10 +270,10 @@ class DaVinciCode():
                 children_c, color = recur_hierarch(frame[key])
                 if isinstance(color, np.ndarray):
                     color = color[0]
-                
+
                 if color != 'grey':
                     colors.append(color)
-                
+
                 if children_c != [] and not isinstance(children_c, float) and not isinstance(children_c, str) and not isinstance(children_c[0], np.float64) and not isinstance(children_c[0], np.float32) :
                     # node
                     children.append({'name': key, 'color': color, 'children': children_c})
@@ -276,13 +318,13 @@ class DaVinciCode():
             subtree['size'] = 1
         else:
             subtree['children'] = [recurs]
-        
+
         if 'children' not in current:
             current['children'] = []
         current['children'].append(subtree)
         # print(subtree)
         return subtree
-        
+
 
     ## Tree Functions
     def grab_node(self, path, dictionary):
@@ -333,20 +375,20 @@ class DaVinciCode():
             if float(dictionary['color']) < low_r or float(dictionary['color']) > high_r:
                 return True
             return False
-        
+
         to_delete = []
         for i in range(len(dictionary['children'])):
             if self.remove_nodes_out_of_range(low_r, high_r, dictionary['children'][i]):
                 to_delete.append(i)
-                
+
         # loop backwards to delete multiple indices
         for index in sorted(to_delete, reverse=True):
             del dictionary['children'][index]
-        
+
         # delete this guy if all his children are gone
         if len(dictionary['children']) == 0:
             return True
-        
+
         # update color
         children_colors = [child['color'] for child in dictionary['children'] if child['color'] != 'grey']
         if len(children_colors) > 0:
@@ -435,14 +477,14 @@ class DaVinciCode():
             marks[i/100] = str(i/100)
 
         button_style = {
-            "background-color": "#008CBA", 
-            "border": "none", 
-            "color": "white", 
-            "padding": "15px 32px", 
-            "text-align": "center", 
-            "display": "inline-block", 
-            "font-size": 16, 
-            "margin": "4px 2px", 
+            "background-color": "#008CBA",
+            "border": "none",
+            "color": "white",
+            "padding": "15px 32px",
+            "text-align": "center",
+            "display": "inline-block",
+            "font-size": 16,
+            "margin": "4px 2px",
             "cursor": "pointer",
             "width": "150px",
             "border-radius": "5%"
@@ -531,7 +573,7 @@ class DaVinciCode():
             trigger_context = dash.callback_context.triggered[0]['prop_id']
             if len(dash.callback_context.triggered) <= 1 and self.update_available == False and (trigger_context == 'interval-component.n_intervals' or trigger_context == '.'):
                 raise PreventUpdate
-            
+
             # revert to original state
             data = copy.deepcopy(self.icicle_data)
             # print(data)
@@ -573,7 +615,7 @@ class DaVinciCode():
             trigger_context = dash.callback_context.triggered[0]['prop_id']
             if len(dash.callback_context.triggered) <= 1 and self.update_available == False and (trigger_context == 'interval-component2.n_intervals'):
                 raise PreventUpdate
-            
+
             pc_data_copy = self.pc_data
 
             if len(clickData) == 0:
@@ -586,7 +628,7 @@ class DaVinciCode():
                 # revert to original state
             # delete entries
             pc_data_copy = pc_data_copy.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))
-                
+
             if isinstance(clickData, list):
                 clickData = clickData[0]
 
@@ -602,7 +644,7 @@ class DaVinciCode():
                 subset_counter = len(click_path)
                 if click_path == []:
                     return pc_o
-                
+
                 selected_df = pc_data_copy
                 j = -1
                 for i in click_path:
@@ -619,7 +661,7 @@ class DaVinciCode():
                 for i in self.hierarchy_path[subset_counter:]:
                     if sample_vals[i]:
                         labels_pc[i] = sample_vals[i].split("=")[0]
-                
+
                 selected_df = selected_df.apply(make_ints, axis=1)
                 self.pc = px.parallel_coordinates(selected_df, color="accuracy", dimensions=self.hierarchy_path[subset_counter:] + ['accuracy'],
                                         labels=labels_pc, color_continuous_scale='RdBu', height=350)
@@ -628,7 +670,7 @@ class DaVinciCode():
             self.pc = px.parallel_coordinates(pc_data_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
             return self.pc
-        
+
         @app.callback(
             Output('sandbox', 'value'),
             [Input({'role': 'icicle_plot_fig', 'index': ALL}, 'value')])
@@ -651,7 +693,7 @@ class DaVinciCode():
                     if '=' not in i:
                         model_name = i
                         continue
-                    
+
                     try:
                         params_rec[i.split("=")[0]] = float(i.split("=")[1]) # for int, long, float and complex
                         if params_rec[i.split("=")[0]].is_integer():
@@ -670,14 +712,14 @@ class DaVinciCode():
         def check_execution(n_intervals):
 
             button_style = {
-                "background-color": "#008CBA", 
-                "border": "none", 
-                "color": "white", 
-                "padding": "15px 32px", 
-                "text-align": "center", 
-                "display": "inline-block", 
-                "font-size": 16, 
-                "margin": "4px 2px", 
+                "background-color": "#008CBA",
+                "border": "none",
+                "color": "white",
+                "padding": "15px 32px",
+                "text-align": "center",
+                "display": "inline-block",
+                "font-size": 16,
+                "margin": "4px 2px",
                 "cursor": "pointer",
                 "width": "150px",
                 "border-radius": "5%"
@@ -757,25 +799,34 @@ class DaVinciCode():
             model_name = Model.__name__
         else:
             model_name = library
-        
-        with mlflow.start_run():
-            mlflow.set_tag("highlighted", highlighted)
-            if library == 'sklearn':
-                    model = Model(**params).fit(self.X_train, self.y_train)
-                    params['model_name'] = model_name
-                    mlflow.log_params(params)
-                    mlflow.log_metric('accuracy', model.score(self.X_test, self.y_test))
-            elif library == 'xgboost':
-                    dtrain = xgb.DMatrix(self.X_train, label=self.y_train)
-                    dtest = xgb.DMatrix(self.X_test, label=self.y_test)
-                    model = xgb.train(params, dtrain, evals=[(dtrain, 'train')])
-                    y_proba = model.predict(dtest)
-                    y_pred = y_proba.argmax(axis=1)
-                    loss = log_loss(self.y_test, y_proba)
-                    acc = accuracy_score(self.y_test, y_pred)
-                    mlflow.log_metrics({'log_loss': loss, 'accuracy': acc})
-                    mlflow.log_param('model_name', model_name)
-                    # return acc
+
+        con = self.db_connect(self.db_path)
+        cur = con.cursor()
+
+        if library == 'sklearn':
+            model = Model(**params).fit(self.X_train, self.y_train)
+            param_names = ", ".join(params.keys())
+            param_values = ", ".join(str(val) for val in params.values())
+
+            self.db_entry(cur, model_name, param_names, param_values, "accuracy", model.score(self.X_test, self.y_test), 1)
+            con.commit()
+
+            output = self.db_query(cur)
+            # formatted_result = [f"{id:<5}{model:<20}{params:<30}{param_vals:<25}{metrics:<30}{metric_vals:<25}{highlighted:<5}" for id, model, params, param_vals, metrics, metric_vals, highlighted in output]
+            # id, model, params, param_vals, metrics, metric_vals, highlighted = "id", "model", "params", "param_vals", "metrics", "metric_vals", "highlighted"
+            # print('\n'.join([f"{id:<5}{model:<20}{params:<30}{param_vals:<25}{metrics:<30}{metric_vals:<25}{highlighted:<5}"] + formatted_result))
+
+        elif library == 'xgboost':
+            dtrain = xgb.DMatrix(self.X_train, label=self.y_train)
+            dtest = xgb.DMatrix(self.X_test, label=self.y_test)
+            model = xgb.train(params, dtrain, evals=[(dtrain, 'train')])
+            y_proba = model.predict(dtest)
+            y_pred = y_proba.argmax(axis=1)
+            loss = log_loss(self.y_test, y_proba)
+            acc = accuracy_score(self.y_test, y_pred)
+            mlflow.log_metrics({'log_loss': loss, 'accuracy': acc})
+            mlflow.log_param('model_name', model_name)
+            # return acc
 
     def normalize_row_keys(params, goal):
         for i in goal.keys():
@@ -826,9 +877,51 @@ class DaVinciCode():
 
     def clear(self):
         self.reset()
+
+    def db_connect(self, db_path):
+
+        con = sqlite3.connect(db_path)
+        return con
+
+    def db_entry(self, cur, model, params, param_vals, metrics, metric_vals, highlighted):
+        sql = """
+            INSERT INTO metrics (model, params, param_vals, metrics, metric_vals, highlighted)
+            VALUES (?, ?, ?, ?, ?, ?)"""
+
+        cur.execute(sql, (model, params, param_vals, metrics, metric_vals, highlighted))
+
+
+    def db_query(self, cur):
+        sql = """
+            SELECT id, model, params, param_vals, metrics, metric_vals, highlighted FROM metrics"""
+
+        cur.execute(sql)
+        return cur.fetchall()
+
     def __init__(self, port, X_test=None, X_train=None, y_train=None, y_test=None):
 
         self.port = port
+
+        self.db_path = os.path.join(os.path.dirname(__file__), 'database.sqlite3')
+
+        if not os.path.isfile(self.db_path):
+
+            con = self.db_connect(self.db_path)
+            cur = con.cursor()
+
+            model_metrics = """
+            CREATE TABLE metrics (
+                id integer PRIMARY KEY,
+                model text NOT NULL,
+                params text NOT NULL,
+                param_vals text NOT NULL,
+                metrics text NOT NULL,
+                metric_vals text NOT NULL,
+                highlighted integer)"""
+
+            cur.execute(model_metrics)
+
+            con.commit()
 
         warnings.filterwarnings("ignore")
 
@@ -865,6 +958,7 @@ class DaVinciCode():
             # empty autologs dir
             return
         # if pc_data[0].count() > 0:
+
         self.update()
 # grab_autologs('/Users/dhruvm/Documents/GitHub/ml-viz/ml-viz/')
 # create_hierarchy()
