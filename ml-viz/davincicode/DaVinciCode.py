@@ -133,40 +133,6 @@ class DaVinciCode():
             print(row)
             dictionary.append(row)
 
-        # dirs = []
-        # if os.path.exists(self.logs_path + "mlruns"):
-        #     dirs = os.listdir(self.logs_path + "mlruns/0")
-        # dictionary = []
-        # for i in dirs:
-        #     row = {}
-        #     if "meta" in i or "DS_Store" in i:
-        #         continue
-        #
-            # if not os.path.isfile(self.logs_path + 'mlruns/0/' + i + '/metrics/accuracy'):
-            #     continue
-            # accuracy = float(open(self.logs_path + 'mlruns/0/' + i + '/metrics/accuracy').read().split(" ")[1])
-            # row['accuracy'] = accuracy
-            # params_files = os.listdir(self.logs_path + 'mlruns/0/' + i + '/params')
-            # model_params = {}
-            # model_name = 0
-            # for j in params_files:
-            #     if 'model_name' in j:
-            #         model_name = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
-            #         continue
-            #     # if 'kernel' in j:
-            #     #     continue
-            #     model_params[j] = open(self.logs_path + 'mlruns/0/' + i + '/params/' + j).read()
-            #
-            # highlighted_file = open(self.logs_path + 'mlruns/0/' + i + '/tags/highlighted').read()
-            # if "True" in highlighted_file:
-            #     row['highlighted'] = True
-            # elif "False" in highlighted_file:
-            #     row['highlighted'] = False
-            #
-            # row['model_params'] = model_params
-            # row['model'] = model_name
-            # dictionary.append(row)
-
         hyperparameters = []
         if dictionary:
             self.pc_data = pd.DataFrame(dictionary)
@@ -255,12 +221,10 @@ class DaVinciCode():
 
         # now remove the highlighted tags from the pandas dataframe (so it doesn't mess up the parallel coordinates plot)
         self.pc_data = self.pc_data.replace(" highlighted", "", regex=True)
-        # print(self.pc_data)
         self.low_color = 2.0
         self.high_color = -1.0
         def recur_hierarch(frame):
             if isinstance(frame, np.float64) or isinstance(frame, np.float32) or isinstance(frame, float) or isinstance(frame, np.ndarray) or isinstance(frame, str):
-                # print(frame)
                 if isinstance(frame, np.ndarray):
                     return frame[0], frame[0]
                 return frame, frame
@@ -298,15 +262,12 @@ class DaVinciCode():
                         child = {'name': key, 'color': color, 'size': 1}
                         children.append(child)
 
-            # print(frame)
-            # print(children)
             if len(colors) == 0:
                 return children, 'grey'
             return children, max(colors)
 
         children_icicle_data, color = recur_hierarch(self.icicle_data)
         self.icicle_data = {'name': 'main', 'color': color, 'children': children_icicle_data}
-        # print(self.icicle_data)
 
     def attach_subtree(self, path, current):
         if path == []:
@@ -353,9 +314,6 @@ class DaVinciCode():
                     if found:
                         break
             if not found:
-                # print(stack + [searcher])
-                # print(current)
-                # print()
                 self.attach_subtree(stack, current)
                 return self.grab_node(path, dictionary)
         return current
@@ -406,19 +364,6 @@ class DaVinciCode():
 
         return True
 
-    # def add_rec(self, path, value, dictionary):
-    #     node = {'name': value, 'color': 'grey', 'size': 2}
-    #     if path == ['main']:
-    #         dictionary['children'].append(node)
-    #         return
-    #     current = self.grab_node(path, dictionary)
-    #     current.pop('size', None)
-    #     if 'children' not in current:
-    #         current['children'] = []
-    #     # check for duplicates
-    #     if not any(child['value'] == value for child in current['children']):
-    #         current['children'].append(node)
-
     def highlight_executed_recs(self, dictionary):
         pc_data[pc_data['highlighted'] == True].apply(lambda row: self.grab_node(dictionary), axis=1)
 
@@ -430,12 +375,8 @@ class DaVinciCode():
     def init_app(self):
 
         app = JupyterDash(__name__)
-        # app = dash.Dash()
         app.css.config.serve_locally = True
         app.scripts.config.serve_locally = True
-
-        # self.add_rec(['main', 'MLPClassifier'], 'alpha=0.1', self.icicle_data)
-        # self.add_rec(['main', 'MLPClassifier'], 'alpha=0.01', self.icicle_data)
 
         def df_to_dict(ut):
             data = {}
@@ -546,24 +487,6 @@ class DaVinciCode():
                     verticalHeight=500
                 )
             ], style={'margin-left': '90%', 'margin-top':'2%'})
-            # html.Div([
-            #         html.H3('Sand Box', id='sandboxtext', style={"text-align": 'center'}),
-            #         dcc.Textarea(
-            #             id='sandbox',
-            #             value='',
-            #             style={'height': 400}
-            #         ),
-            #         html.Div([
-            #             html.Button('Execute', id='execute-button', style=button_style),
-            #             dcc.Loading(
-            #                 id="loading",
-            #                 children=html.Div([
-            #                     html.Div(id='output')
-            #                 ]),
-            #                 type="circle"
-            #             )
-            #         ], style= {'right': 37, 'position': 'absolute'})
-            #     ], style={'margin-left': '5%'})
         ], style={'height': '100%', 'overflow': 'hidden'})
         @app.callback(
             Output('icicle-wrap', 'children'),
@@ -588,7 +511,6 @@ class DaVinciCode():
                     self.rangeDataOld = rangeData
 
             if self.update_available:
-                # print("update vailable")
                 self.id_updater+=1
                 self.update_available = False
 
@@ -624,8 +546,7 @@ class DaVinciCode():
                                     color_continuous_scale='RdBu', height=350)
                     return pc
                 raise PreventUpdate
-                # return self.pc
-                # revert to original state
+
             # delete entries
             pc_data_copy = pc_data_copy.query("accuracy >= " + str(rangeData[0]) + " and accuracy <= " + str(rangeData[1]))
 
@@ -665,7 +586,7 @@ class DaVinciCode():
                 selected_df = selected_df.apply(make_ints, axis=1)
                 self.pc = px.parallel_coordinates(selected_df, color="accuracy", dimensions=self.hierarchy_path[subset_counter:] + ['accuracy'],
                                         labels=labels_pc, color_continuous_scale='RdBu', height=350)
-                # print(pc_data_copy.apply(make_ints, axis=1))
+
                 return self.pc
             self.pc = px.parallel_coordinates(pc_data_copy.apply(make_ints, axis=1), color="accuracy", dimensions=self.hierarchy_path + ['accuracy'],
                                     color_continuous_scale='RdBu', height=350)
@@ -746,25 +667,6 @@ class DaVinciCode():
 
         self.app = app
 
-    # def organize_recs_hierarchy(self):
-    #     for i in range(len(self.recommendations)):
-    #         rec = self.recommendations[i]
-    #         model = rec[0][1]
-
-    #         # if a hierarchy for this model currently exists, reorder the recommendation path accordingly
-    #         if model in self.pc_data['model'].values:
-    #             reconstructed_rec = ['main', model]
-
-    #             model_hyps = self.pc_data[self.pc_data['model'] == model].iloc[0]
-    #             for j in range(self.max_len_candidates):
-    #                 if model_hyps[str(j) + "_order_hyp"]:
-    #                     hyp = model_hyps[str(j) + "_order_hyp"].split("=")[0]
-    #                     for k in rec[0] + [rec[1]]:
-    #                         if hyp in k:
-    #                             reconstructed_rec.append(k)
-
-    #             self.recommendations[i] = [reconstructed_rec[:-1], reconstructed_rec[-1], rec[2]]
-
     def update(self):
         self.grab_autologs()
         self.create_hierarchy()
@@ -775,23 +677,11 @@ class DaVinciCode():
         self.pc_data.drop(self.pc_data.index[self.pc_data['accuracy'] == 'grey'], inplace = True)
         self.pc_data['accuracy'] = self.pc_data['accuracy'].astype(float)
 
-        # self.organize_recs_hierarchy()
-
-        ## Remove Executed Recommendations
-        # hyperparameters = self.pc_data.drop(['rid', 'accuracy', 'model_params', 'highlighted'], axis=1).values.tolist()
-        # for rec in self.recommendations:
-        #     recommendation_path = (rec[0] + [rec[1]])[1:] # remove the 'main' element at the beginning of the list
-        #     ## inefficient
-        #     if any(all(item in recommendation_path for item in ut_list if item is not None) for ut_list in hyperparameters):
-        #         continue
-        #     rec[2] = self.icicle_data
-        #     self.add_rec(*tuple(rec))
         self.update_available = True
         if self.display == False:
             self.init_app()
             self.display = True
             self.app.run_server(mode='inline', port=self.port, width=1000, height=940)
-        # print("updated")
 
     def run_experiment(self, library, Model, params, highlighted=False):
         model_name = ""
@@ -837,14 +727,6 @@ class DaVinciCode():
     def normalize_hyp_keys(params):
         self.pc_data.model_params = self.pc_data.apply(lambda row: self.normalize_row_keys(row.model_params, params), axis=1)
 
-    # def add_experiment(model, params, metric):
-    #     global current_port
-    #     global pc_data
-    #     # experiment = {'rid': pc_data.rid.max() + 1, 'model': model, 'model_params': params, 'accuracy': metric}
-    #     # pc_data = pc_data.append(experiment,ignore_index=True)
-    #     # normalize_hyp_keys(params)
-    #     update()
-
     def experiment(self, library, model, params, highlighted=False, updateViz=True):
         self.running_experiment = True
         self.run_experiment(library, model, params, highlighted)
@@ -861,17 +743,6 @@ class DaVinciCode():
     def reset(self):
         if os.path.isdir(self.logs_path + "mlruns"):
             shutil.rmtree(self.logs_path + "mlruns")
-        # # self.recommendations = []
-        # self.pc_data = pd.DataFrame()
-        # self.icicle_data = {"name": "main", "color": "grey", "children": []}
-        # for rec in self.recommendations:
-        #     rec[2] = self.icicle_data
-        #     self.add_rec(*tuple(rec))
-        # self.update_available = True
-        # if self.display == False:
-        #     self.init_app()
-        #     self.display = True
-        #     self.app.run_server(mode='inline', port=self.port, width=1000, height=940)
 
         self.update()
 
@@ -935,8 +806,6 @@ class DaVinciCode():
         self.y_train = y_train
         self.y_test = y_test
 
-        # display(HTML("<script>$('div.cell.selected').children('div.output_wrapper').height(940);</script>"))
-
         recs = [
             [['main', 'MLPClassifier', 'alpha=0.1'], 'max_iter=300', self.icicle_data],
             [['main', 'MLPClassifier', 'max_iter=400'], 'alpha=0.01', self.icicle_data],
@@ -955,11 +824,6 @@ class DaVinciCode():
         if all(['.' in fileD for fileD in os.listdir(self.logs_path + "mlruns/0")]):
             if self.recommendations:
                 self.reset()
-            # empty autologs dir
             return
-        # if pc_data[0].count() > 0:
 
         self.update()
-# grab_autologs('/Users/dhruvm/Documents/GitHub/ml-viz/ml-viz/')
-# create_hierarchy()
-# format_icicle_data()
